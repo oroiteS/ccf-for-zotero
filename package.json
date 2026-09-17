@@ -18,9 +18,10 @@
   "homepage": "https://github.com/nyaru177/ccf-for-zotero#readme",
   "license": "AGPL-3.0-or-later",
   "scripts": {
-    "build": "zotero-plugin build && tsc --noEmit",
+    "build": "node tools/build.mjs",
     "test": "tsx --test tests/*.test.ts",
     "check": "npm run test && npm run build",
+    "build:ccf-catalog": "node tools/build-ccf-catalog.mjs",
     "build:cas-catalog": "node tools/build-cas-catalog-from-official-export.mjs",
     "audit:cas-catalog": "node tools/audit-cas-catalog.mjs",
     "audit:cas-public-release": "node tools/audit-cas-public-release.mjs",

@@ -1,5 +1,6 @@
 import ccfData from "../data/ccf-2026.json";
 import highQualityJournalData from "../data/ccf-high-quality-journals-2025.json";
+import { ccfVenueAugmentations } from "../data/ccfVenueAugmentations";
 import {
   CCFDataFile,
   CCFKind,
@@ -23,7 +24,7 @@ const data: CCFDataFile = {
   source: `${internationalData.source}; ${chineseJournalData.source}`,
   venues: [...internationalData.venues, ...chineseJournalData.venues],
 };
-const MATCHER_VERSION = "0.1.16-cache-fingerprint";
+const MATCHER_VERSION = "0.1.16-v2-cache-fingerprint";
 
 const genericTokens = new Set([
   "acm",
@@ -46,7 +47,9 @@ const genericTokens = new Set([
 ]);
 
 const tokenExpansions: Record<string, string> = {
-  adv: "advanced",
+  adv: "advances",
+  advances: "advances",
+  advanced: "advanced",
   anal: "analysis",
   artif: "artificial",
   autom: "automation",
@@ -58,14 +61,19 @@ const tokenExpansions: Record<string, string> = {
   digit: "digital",
   electr: "electrical",
   eng: "engineering",
+  inf: "information",
+  inform: "information",
   int: "international",
   intell: "intelligence",
   lang: "language",
   linguist: "linguistics",
   mach: "machine",
-  proc: "processing",
+  proc: "proceedings",
+  process: "processing",
+  res: "research",
   robot: "robotics",
   secur: "security",
+  soc: "society",
   softw: "software",
   syst: "systems",
   technol: "technology",
@@ -102,14 +110,26 @@ function normalizeAbbr(value: string): string {
 }
 
 function stripBoilerplate(value: string): string {
-  return value
+  let cleaned = value
     .replace(/^proceedings of (the )?/i, "")
     .replace(/^proc\.? of (the )?/i, "")
+    .replace(/^proc\.?\s*-\s*/i, "")
     .replace(/^in:\s*/i, "")
     .replace(/^\d{4}\s+/, "")
+    .replace(/\s*\((?:19|20)\d{2}\)\s*$/g, " ")
     .replace(/\s*\(.*?\)\s*$/g, " ")
+    .replace(/\s*,\s*(?:19|20)\d{2}\b/g, " ")
+    .replace(/\s*,\s*vol(?:ume)?\.?\s*\d+\b/gi, " ")
+    .replace(/\s*,\s*pp\.?\s*\d+.*$/gi, " ")
+    .replace(/\s+(?:19|20)\d{2}\s*$/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  // 如果字符串较长且末尾是单纯的届数/卷号数字（如 "Advances in Neural Information Processing Systems 36"）
+  if (cleaned.length > 12 && /\s+\d{1,3}$/.test(cleaned)) {
+    cleaned = cleaned.replace(/\s+\d{1,3}$/, "").trim();
+  }
+  return cleaned;
 }
 
 function getStrictNonMainMarkers(value: string): Set<string> {
@@ -199,6 +219,25 @@ function candidateExplicitlyRejectsVenue(
     return true;
   }
 
+  if (
+    venueAbbr === "TOIS" &&
+    (/\bneural\b/.test(normalized) ||
+      /\badvances in neural\b/.test(normalized) ||
+      /\bneurips\b/.test(normalized) ||
+      /\bnips\b/.test(normalized))
+  ) {
+    return true;
+  }
+
+  if (
+    venueAbbr === "ICONIP" &&
+    (/\bsystems\b/.test(normalized) ||
+      /\bneurips\b/.test(normalized) ||
+      /\bnips\b/.test(normalized))
+  ) {
+    return true;
+  }
+
   return Boolean(venueAbbr === "ICRA" && abbr === "ICRAI");
 }
 
@@ -237,7 +276,11 @@ function containsCjk(value: string): boolean {
 
 function generateAliases(venue: CCFVenue): string[] {
   const aliases = new Set<string>();
-  const rawAliases = [venue.abbr, venue.fullName, ...(venue.aliases || [])];
+  const augs = [
+    ...(ccfVenueAugmentations[venue.fullName] || []),
+    ...(ccfVenueAugmentations[venue.abbr] || []),
+  ];
+  const rawAliases = [venue.abbr, venue.fullName, ...(venue.aliases || []), ...augs];
 
   for (const alias of rawAliases) {
     const normalizedText = normalizeText(alias);
@@ -302,6 +345,20 @@ function buildIndex() {
 const index = buildIndex();
 const ambiguousBareAbbrs = new Set(["AI"]);
 
+function stripOrdinalsAndYears(value: string): string {
+  return value
+    .replace(/\b(?:19|20)\d{2}\b/g, " ")
+    .replace(/\b\d+(?:st|nd|rd|th)\b/gi, " ")
+    .replace(
+      /\b(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|thirtieth|fortieth|fiftieth)\b/gi,
+      " ",
+    )
+    .replace(/\bannual\b/gi, " ")
+    .replace(/\binternational\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function deriveCanonicalVenueQueries(value: string): string[] {
   const queries = new Set<string>();
   const normalized = normalizeText(value);
@@ -334,6 +391,65 @@ function deriveCanonicalVenueQueries(value: string): string[] {
     queries.add("NAACL");
   }
 
+  if (
+    /\b(advances in neural information processing systems|neural information processing systems)\b/i.test(
+      value,
+    ) ||
+    /\b(neurips|nips)\s*(?:19|20)?\d{2}\b/i.test(value) ||
+    /\badv\.?\s*neural\s*inf\.?\s*process\.?\s*syst\.?\b/i.test(value)
+  ) {
+    queries.add("NeurIPS");
+    queries.add("Advances in Neural Information Processing Systems");
+    queries.add("Conference on Neural Information Processing Systems");
+  }
+
+  if (
+    /\b(proceedings of machine learning research|pmlr)\b/i.test(value) ||
+    /\bint(ernational)?\s+conf(erence)?\s+on\s+machine\s+learning\b/i.test(value)
+  ) {
+    queries.add("ICML");
+    queries.add("International Conference on Machine Learning");
+  }
+
+  if (
+    /\b(proceedings of the vldb endowment|pvldb)\b/i.test(value) ||
+    /\bproc\.?\s+vldb\s+endow\.?\b/i.test(value)
+  ) {
+    queries.add("VLDB");
+    queries.add("International Conference on Very Large Data Bases");
+  }
+
+  if (
+    /\b(ieee\/cvf\s+)?(computer\s+vision\s+and\s+pattern\s+recognition|cvpr)\b/i.test(
+      value,
+    )
+  ) {
+    queries.add("CVPR");
+    queries.add("IEEE/CVF Computer Vision and Pattern Recognition Conference");
+  }
+
+  if (
+    /\b(sigkdd|kdd)\s*(?:19|20)?\d{2}\b/i.test(value) ||
+    /\bknowledge\s+discovery\s+and\s+data\s+mining\b/i.test(value)
+  ) {
+    queries.add("SIGKDD");
+    queries.add("KDD");
+  }
+
+  if (
+    /\b(interactive,\s*mobile,\s*wearable\s*and\s*ubiquitous\s*technologies|imwut)\b/i.test(
+      value,
+    )
+  ) {
+    queries.add("UbiComp");
+    queries.add("IMWUT");
+  }
+
+  const strippedOrdinal = stripOrdinalsAndYears(value);
+  if (strippedOrdinal && strippedOrdinal !== value) {
+    queries.add(strippedOrdinal);
+  }
+
   return [...queries].filter((query) => query !== value);
 }
 
@@ -357,78 +473,127 @@ function scoreVenue(
   kindHint?: CCFKind,
 ): number {
   let score = 0;
+  const kindMatches = Boolean(kindHint && indexed.venue.kind === kindHint);
   const kindMismatch = Boolean(kindHint && indexed.venue.kind !== kindHint);
-  const safeFullNameContainment = indexed.meaningfulTokens.size >= 3;
-  const fullNameWordCount = indexed.normalizedFullName
-    .split(" ")
-    .filter(Boolean).length;
-  const requiredTokenOverlap =
-    indexed.meaningfulTokens.size === 2 && fullNameWordCount >= 4
-      ? indexed.meaningfulTokens.size
-      : 3;
+  const isShortCandidate =
+    candidate.trim().length <= 5 || !candidate.trim().includes(" ");
+
+  if (kindMismatch && isShortCandidate) {
+    return 0;
+  }
+
   const explicitAbbrs = extractExplicitAbbrs(candidate);
   const explicitAbbrConflict = !explicitAbbrSupportsVenue(
     explicitAbbrs,
     indexed,
   );
-  const broadMatchAllowed =
-    !kindMismatch &&
-    !explicitAbbrConflict &&
-    indexedVenueAllowsStrictMarkers(candidate, indexed) &&
-    !candidateExplicitlyRejectsVenue(candidate, indexed);
+  const hasExplicitAbbrSupport =
+    explicitAbbrs.length > 0 && !explicitAbbrConflict;
 
   if (candidateExplicitlyRejectsVenue(candidate, indexed)) {
     return 0;
   }
-
-  if (kindHint && indexed.venue.kind === kindHint) {
-    score += 120;
+  if (explicitAbbrConflict) {
+    return 0;
+  }
+  if (!indexedVenueAllowsStrictMarkers(candidate, indexed)) {
+    return 0;
   }
 
-  if (!kindMismatch && normalizedCandidate === indexed.normalizedFullName) {
-    score += 1000;
-  } else if (
-    broadMatchAllowed &&
-    safeFullNameContainment &&
-    normalizedCandidate.includes(indexed.normalizedFullName)
-  ) {
-    score += 820;
+  // 1. 全称精确匹配：1000分
+  if (normalizedCandidate === indexed.normalizedFullName) {
+    return 1000 + (kindMatches ? 20 : 0);
   }
 
   const candidateAbbr = normalizeAbbr(candidate);
-  const seenAliases = new Set<string>();
+  // 2. 别名精确匹配：950 - 980 分
   for (const alias of indexed.aliases) {
-    const aliasKey = `${normalizeText(alias)}|${normalizeAbbr(alias)}`;
-    if (seenAliases.has(aliasKey)) continue;
-    seenAliases.add(aliasKey);
-
-    if (!kindMismatch && candidateAbbr === alias) {
-      score += 950;
-    } else if (
-      broadMatchAllowed &&
-      alias.length >= 4 &&
-      containsAlias(normalizedCandidate, alias)
-    ) {
-      score += 650;
+    const normAlias = normalizeText(alias);
+    if (normalizedCandidate === normAlias) {
+      return 980 + (kindMatches ? 20 : 0);
+    }
+    if (candidateAbbr === normalizeAbbr(alias)) {
+      return 950 + (kindMatches ? 20 : 0);
     }
   }
 
-  const tokens = tokenizeMeaningful(candidate);
+  // 3. 全称安全包含匹配
+  const safeFullNameContainment = indexed.meaningfulTokens.size >= 3;
+  const candidateTokens = tokenizeMeaningful(candidate);
+  if (
+    !kindMismatch &&
+    safeFullNameContainment &&
+    normalizedCandidate.includes(indexed.normalizedFullName)
+  ) {
+    let matchedInCandidate = 0;
+    for (const t of candidateTokens) {
+      if (indexed.meaningfulTokens.has(t)) matchedInCandidate++;
+    }
+    const unconsumed = candidateTokens.size - matchedInCandidate;
+    if (unconsumed <= 2) {
+      score = Math.max(score, 850 - unconsumed * 30 + (kindMatches ? 20 : 0));
+    }
+  }
+
+  // 4. 别名包含匹配
+  for (const alias of indexed.aliases) {
+    const normAlias = normalizeText(alias);
+    if (!kindMismatch && normAlias.length >= 4 && containsAlias(normalizedCandidate, normAlias)) {
+      const aliasTokens = tokenizeMeaningful(alias);
+      if (aliasTokens.size >= 1) {
+        let matched = 0;
+        for (const t of candidateTokens) {
+          if (aliasTokens.has(t)) matched++;
+        }
+        const unconsumed = candidateTokens.size - matched;
+        if (unconsumed <= 2) {
+          score = Math.max(
+            score,
+            750 - unconsumed * 30 + (kindMatches ? 60 : 0) + (hasExplicitAbbrSupport ? 100 : 0),
+          );
+        }
+      }
+    }
+  }
+
+  // 5. 模糊关键词重叠打分：类型冲突时严禁跨类型模糊匹配
+  if (kindMismatch) {
+    return score;
+  }
+
   let overlap = 0;
-  for (const token of tokens) {
+  for (const token of candidateTokens) {
     if (indexed.meaningfulTokens.has(token)) {
       overlap += 1;
     }
   }
-  if (broadMatchAllowed && overlap >= requiredTokenOverlap) {
-    const precision = overlap / Math.max(tokens.size, 1);
-    const recall = overlap / Math.max(indexed.meaningfulTokens.size, 1);
-    const f1 = (2 * precision * recall) / Math.max(precision + recall, 0.01);
-    const base =
-      indexed.meaningfulTokens.size === 2 && fullNameWordCount >= 4
-        ? 550
-        : 500;
-    score += Math.round(base + f1 * 200);
+
+  const venueTokenCount = indexed.meaningfulTokens.size;
+  const candidateTokenCount = candidateTokens.size;
+  const unconsumedTokens = candidateTokenCount - overlap;
+
+  const precision = candidateTokenCount > 0 ? overlap / candidateTokenCount : 0;
+  const recall = venueTokenCount > 0 ? overlap / venueTokenCount : 0;
+
+  // 核心防御：短刊名（<= 2 词，如 TOIS: information, systems）若无显式缩写支持，严禁低精度或高未消耗词的模糊匹配
+  if (
+    venueTokenCount <= 2 &&
+    !hasExplicitAbbrSupport &&
+    (precision < 0.65 || unconsumedTokens > 1)
+  ) {
+    return score;
+  }
+
+  const requiredOverlap = venueTokenCount <= 2 ? 2 : 3;
+  if (overlap >= requiredOverlap && precision >= 0.55 && recall >= 0.6) {
+    const f1 = (2 * precision * recall) / (precision + recall);
+    const base = venueTokenCount <= 2 && indexed.normalizedFullName.split(" ").length >= 4 ? 540 : 500;
+    const tokenScore = Math.round(
+      base + f1 * 250 - unconsumedTokens * 60 + (kindMatches ? 60 : 0) + (hasExplicitAbbrSupport ? 100 : 0),
+    );
+    if (tokenScore > score) {
+      score = tokenScore;
+    }
   }
 
   return score;
@@ -439,22 +604,43 @@ function pickBest(
   candidate: string,
   kindHint?: CCFKind,
 ): IndexedVenue | undefined {
-  const compatibleEntries = kindHint
-    ? entries.filter((entry) => entry.venue.kind === kindHint)
-    : entries;
-  const allowedEntries = compatibleEntries.filter((entry) =>
+  let candidatePool = entries;
+  if (kindHint) {
+    const matchingKind = entries.filter(
+      (entry) => entry.venue.kind === kindHint,
+    );
+    if (matchingKind.length > 0) {
+      candidatePool = matchingKind;
+    } else {
+      // 如果没有直接匹配 kindHint 的条目：
+      // 只有长全称/长出版物名称（非短缩写）才允许跨类型容错；短简称（<=5字符或单词）严格遵从 kindHint
+      const trimmed = candidate.trim();
+      const isShortAbbr = trimmed.length <= 5 || !trimmed.includes(" ");
+      if (isShortAbbr) {
+        return undefined;
+      }
+      candidatePool = entries;
+    }
+  }
+
+  const allowedEntries = candidatePool.filter((entry) =>
     candidateCanMatchIndexed(candidate, entry),
   );
   if (allowedEntries.length === 0) return undefined;
   if (allowedEntries.length === 1) return allowedEntries[0];
 
   const normalizedCandidate = normalizeText(candidate);
-  return allowedEntries
+  const scored = allowedEntries
     .map((entry) => ({
       entry,
       score: scoreVenue(candidate, normalizedCandidate, entry, kindHint),
     }))
-    .sort((a, b) => b.score - a.score)[0]?.entry;
+    .sort((a, b) => b.score - a.score);
+
+  const best = scored[0];
+  if (!best || best.score <= 0) return undefined;
+
+  return best.entry;
 }
 
 export function findVenue(
@@ -464,8 +650,13 @@ export function findVenue(
   const stripped = stripBoilerplate(value);
   if (!stripped) return undefined;
 
-  const queries = [stripped, ...deriveCanonicalVenueQueries(stripped)];
-  for (const query of queries) {
+  const queries = [
+    stripped,
+    ...deriveCanonicalVenueQueries(value),
+    ...deriveCanonicalVenueQueries(stripped),
+  ];
+  const uniqueQueries = [...new Set(queries)];
+  for (const query of uniqueQueries) {
     const match = findVenueFromQuery(query, kindHint, stripped);
     if (match) return match;
   }

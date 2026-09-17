@@ -48,8 +48,22 @@ function hasWorkshopMarker(value: string): boolean {
 }
 
 function extractBracketAbbr(value: string): string[] {
-  const matches = [...value.matchAll(/\(([A-Za-z][A-Za-z0-9+/-]{1,})\)/g)];
-  return matches.map((match) => match[1]);
+  const results = new Set<string>();
+  for (const match of value.matchAll(/\(([^)]+)\)/g)) {
+    const inner = match[1].trim();
+    if (/^[A-Za-z][A-Za-z0-9+/-]{1,}$/.test(inner)) {
+      results.add(inner);
+      continue;
+    }
+    const yearMatch = inner.match(
+      /^([A-Za-z][A-Za-z0-9+/-]{1,})\s*['’]?(?:19|20)?\d{2}$/,
+    );
+    if (yearMatch?.[1]) {
+      results.add(yearMatch[1]);
+      results.add(inner);
+    }
+  }
+  return [...results];
 }
 
 function extractTrailingAbbr(value: string): string[] {

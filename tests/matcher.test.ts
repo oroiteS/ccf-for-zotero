@@ -1120,4 +1120,81 @@ describe("local CCF matcher", () => {
     assert.match(output, /匹配规则：publicationTitle 字段/);
     assert.match(output, /2025 计算领域高质量科技期刊目录/);
   });
+
+  it("accurately matches all forms of NeurIPS and avoids false positive TOIS classification", () => {
+    const directNeuripsCases = [
+      "Advances in Neural Information Processing Systems",
+      "Advances in Neural Information Processing Systems 36",
+      "Advances in Neural Information Processing Systems 35 (NeurIPS 2022)",
+      "Adv Neural Inf Process Syst",
+      "Adv. Neural Inf. Process. Syst.",
+      "Neural Information Processing Systems",
+      "NIPS",
+      "NIPS 2017",
+      "NeurIPS 2023",
+      "Proceedings of the 35th International Conference on Neural Information Processing Systems",
+      "35th Conference on Neural Information Processing Systems",
+    ];
+
+    for (const input of directNeuripsCases) {
+      const match = findVenue(input);
+      assert.equal(
+        match?.abbr,
+        "NeurIPS",
+        `Expected ${input} to match NeurIPS, got ${match?.abbr}`,
+      );
+      assert.equal(match?.rank, "A");
+    }
+
+    // Critical test: When itemType is journalArticle (common across crawlers like Google Scholar/CrossRef),
+    // NeurIPS proceedings must NOT be misclassified as TOIS!
+    const journalNeuripsItem = makeItem(
+      { publicationTitle: "Advances in Neural Information Processing Systems 35" },
+      "journalArticle",
+    );
+    const resolved = resolveVenueCandidates(journalNeuripsItem);
+    const candidateResult = matchCandidates(resolved.candidates, resolved.isPreprint);
+    assert.equal(
+      candidateResult.abbr,
+      "NeurIPS",
+      `Expected journalArticle NeurIPS to match NeurIPS, got ${candidateResult.abbr}`,
+    );
+    assert.equal(candidateResult.rank, "A");
+
+    // True TOIS papers must still match TOIS
+    const trueToisCases = [
+      "ACM Transactions on Information Systems",
+      "ACM Trans. Inf. Syst.",
+      "TOIS",
+    ];
+    for (const input of trueToisCases) {
+      const match = findVenue(input, "journal");
+      assert.equal(match?.abbr, "TOIS", `Expected ${input} to match TOIS, got ${match?.abbr}`);
+      assert.equal(match?.rank, "A");
+    }
+
+    // Other high-profile conference proceedings and journals
+    const extraCases: Array<[string, string]> = [
+      ["Proceedings of the VLDB Endowment", "VLDB"],
+      ["PVLDB", "VLDB"],
+      ["Proceedings of Machine Learning Research", "ICML"],
+      ["PMLR", "ICML"],
+      ["Proceedings of the ACM on Interactive, Mobile, Wearable and Ubiquitous Technologies", "UbiComp"],
+      ["IMWUT", "UbiComp"],
+      ["The Web Conference", "WWW"],
+      ["ACM SIGKDD International Conference on Knowledge Discovery and Data Mining", "SIGKDD"],
+      ["IEEE Symposium on Security and Privacy", "S&P"],
+      ["IEEE/ACM International Conference on Software Engineering", "ICSE"],
+    ];
+
+    for (const [input, expectedAbbr] of extraCases) {
+      const match = findVenue(input);
+      assert.equal(
+        match?.abbr,
+        expectedAbbr,
+        `Expected ${input} to match ${expectedAbbr}, got ${match?.abbr}`,
+      );
+      assert.equal(match?.rank, "A");
+    }
+  });
 });
