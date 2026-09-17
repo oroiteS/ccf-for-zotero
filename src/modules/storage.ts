@@ -68,13 +68,25 @@ export function getStoredState(
   if (invalidatedItemIDs.has(String(item.id))) return undefined;
 
   const validateInputFingerprint = options.validateInputFingerprint !== false;
+  const fingerprintMatches =
+    !validateInputFingerprint ||
+    !state.inputFingerprint ||
+    state.inputFingerprint === getItemInputFingerprint(item);
+
+  if (!fingerprintMatches) {
+    return undefined;
+  }
+
   if (
     state.catalogVersion === getCatalogVersion() &&
-    state.matcherVersion === getMatcherVersion() &&
-    (!validateInputFingerprint ||
-      !state.inputFingerprint ||
-      state.inputFingerprint === getItemInputFingerprint(item))
+    state.matcherVersion === getMatcherVersion()
   ) {
+    return state;
+  }
+
+  // 平滑兼容：若目录版本相同且输入指纹未变（仅 matcherVersion 升级），先保留现有缓存状态，
+  // 避免在列渲染等只读快速路径下将用户原有的评级瞬间全部抹为 Unknown
+  if (state.catalogVersion === getCatalogVersion() && state.status) {
     return state;
   }
   return undefined;

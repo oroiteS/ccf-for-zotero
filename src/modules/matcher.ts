@@ -184,10 +184,15 @@ function indexedVenueAllowsStrictMarkers(
 function candidateExplicitlyRejectsVenue(
   candidate: string,
   indexed: IndexedVenue,
+  kindHint?: CCFKind,
 ): boolean {
   const normalized = normalizeText(candidate);
   const abbr = normalizeAbbr(candidate).replace(/\s+/g, "");
   const venueAbbr = indexed.venue.abbr;
+
+  if (venueAbbr === "AI" && kindHint && kindHint !== "journal") {
+    return true;
+  }
 
   if (
     venueAbbr === "ICMI" &&
@@ -475,12 +480,6 @@ function scoreVenue(
   let score = 0;
   const kindMatches = Boolean(kindHint && indexed.venue.kind === kindHint);
   const kindMismatch = Boolean(kindHint && indexed.venue.kind !== kindHint);
-  const isShortCandidate =
-    candidate.trim().length <= 5 || !candidate.trim().includes(" ");
-
-  if (kindMismatch && isShortCandidate) {
-    return 0;
-  }
 
   const explicitAbbrs = extractExplicitAbbrs(candidate);
   const explicitAbbrConflict = !explicitAbbrSupportsVenue(
@@ -490,7 +489,7 @@ function scoreVenue(
   const hasExplicitAbbrSupport =
     explicitAbbrs.length > 0 && !explicitAbbrConflict;
 
-  if (candidateExplicitlyRejectsVenue(candidate, indexed)) {
+  if (candidateExplicitlyRejectsVenue(candidate, indexed, kindHint)) {
     return 0;
   }
   if (explicitAbbrConflict) {
@@ -612,11 +611,8 @@ function pickBest(
     if (matchingKind.length > 0) {
       candidatePool = matchingKind;
     } else {
-      // 如果没有直接匹配 kindHint 的条目：
-      // 只有长全称/长出版物名称（非短缩写）才允许跨类型容错；短简称（<=5字符或单词）严格遵从 kindHint
-      const trimmed = candidate.trim();
-      const isShortAbbr = trimmed.length <= 5 || !trimmed.includes(" ");
-      if (isShortAbbr) {
+      // 歧义裸缩写（如 "AI"）严禁跨类型容错
+      if (ambiguousBareAbbrs.has(candidate.trim().toUpperCase())) {
         return undefined;
       }
       candidatePool = entries;

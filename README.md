@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/github/license/nyaru177/ccf-for-zotero?style=flat-square" alt="License">
 </p>
 
-当前版本：`0.2.6`
+当前版本：`0.2.7`
 
 ## 界面预览
 
