@@ -62,10 +62,15 @@ async function onNotify(
   ids: Array<string | number>,
   extraData: { [key: string]: any },
 ) {
-  if (event !== "modify" || type !== "item" || ids.length === 0) return;
-  invalidateItemStates(ids);
-  invalidateCASItemStates(ids);
-  // 失效条目进入防抖后台队列自动重算，避免徽章停留在 Unknown 直到手动刷新。
+  if (type !== "item" || ids.length === 0) return;
+  if (event !== "modify" && event !== "add") return;
+  if (event === "modify") {
+    invalidateItemStates(ids);
+    invalidateCASItemStates(ids);
+  }
+  // 新增（add）与被修改（modify）的条目都进入防抖后台队列自动重算：
+  // 列热路径只读缓存，新条目没有缓存就会一直显示 Unknown，
+  // 直到重启触发新一轮预热；这里保证不重启也能自动补齐。
   queueInvalidationRecompute(ids);
 }
 
