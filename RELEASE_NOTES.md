@@ -1,5 +1,21 @@
 # Release Notes
 
+## v0.2.8
+
+这是一个识别准确率与缓存自愈优化版本，重点解决 arXiv/预印本条目和 OpenReview 页眉式 venue 文本的识别问题，以及条目被修改后徽章停留在 Unknown 的问题。
+
+### 主要变更
+
+- 识别 OpenReview/论文页眉式 venue 前缀：`Published as a conference paper at ICLR 2023`、`Accepted as a conference paper at ACM MM 2023`、`Published in ...` 等写法现在会剥离样板前缀后命中目录。`Under review as a conference paper at ...` 仍视为未发表，不会误判。
+- 新增 arXiv Comments 接收声明识别：Zotero 从 arXiv 抓取条目时会把页面 Comments 字段存进 Extra（如 `Comments: Accepted as ICLR 2026 Oral`），现在会自动提取其中的会议/期刊名称并给出分级。`Under review`、`Submitted`、纯页数图表等描述不会产生候选，识别失败仍回退 `Preprint | arXiv`。
+- 新增失效缓存自动重算队列：条目被修改（用户编辑、同步、其它插件触碰）后，列表徽章此前会停留在 `Unknown` 直到手动刷新；现在失效条目进入 2 秒防抖后台队列自动重算并刷新对应行。≤20 条静默处理，更多条目显示可取消的进度窗口；初始化运行时自动让路。重算只写插件私有缓存，不修改条目，不会触发循环。
+- matcher 版本升级至 0.1.18。目录版本未变，升级后会平滑保留既有缓存结果；无缓存或失效条目由后台重算队列与刷新/初始化任务补齐。
+
+### 校验
+
+- 测试：139 tests passed（新增 Comments 接收声明、页眉式前缀、失效重算队列、ICLR 跨类型回归防护等用例）。
+- 类型检查与构建：通过。
+
 ## v0.2.5
 
 这是一次首次使用流程和批量任务生命周期优化版本，继续保持 CCF/CAS 离线识别与插件私有缓存边界。
