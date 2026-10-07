@@ -96,8 +96,9 @@ function addVenueField(
 
 function extractExtraVenues(extra: string): string[] {
   const venues: string[] = [];
+  // "ccf venue" 是右键手动设置自动写入的持久化线索（见 extraVenue.ts）。
   const pattern =
-    /^\s*(venue|conference|journal|booktitle|proceedings|publication)\s*[:=]\s*(.+)$/i;
+    /^\s*(venue|conference|journal|booktitle|proceedings|publication|ccf\s+venue)\s*[:=]\s*(.+)$/i;
   for (const line of extra.split(/\r?\n/)) {
     const match = line.match(pattern);
     if (match?.[2]) venues.push(match[2]);

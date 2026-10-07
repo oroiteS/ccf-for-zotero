@@ -35,6 +35,10 @@ import { CASItemState, CASJournal, CASMatchResult } from "./casTypes";
 import { formatItemDiagnostics } from "./diagnostics";
 import { filterItemsByDisplayStatus, refreshItemsRank } from "./rankService";
 import { clearItemStates, ignoreItems, saveManualMatches } from "./storage";
+import {
+  removeVenueFromExtra,
+  writeVenueToExtra,
+} from "./extraVenue";
 import { CCFKind, CCFRank, CCFVenue, ItemRankState, MatchResult } from "./types";
 import { resolveJournalIdentityCandidates } from "./journalIdentity";
 import { resolveVenueCandidates } from "./venueResolver";
@@ -856,8 +860,36 @@ async function showSelectedCASDiagnostics(win: Window) {
 
 function setManualVenue(win: Window, items: Zotero.Item[], venue: CCFVenue) {
   saveManualMatches(items, venueToManualResult(venue));
+  // 同时把 venue 持久化到条目 Extra（幂等更新 CCF Venue 行）：
+  // 私有缓存可能因插件重装/清缓存丢失，条目元数据才是可恢复的持久线索，
+  // 诊断的实时计算也能直接看到该线索。
+  void persistVenueExtraLines(items, venue);
   refreshItemsView(items, "soft");
   alertUser(win, text.manualDone(items.length, venue));
+}
+
+async function persistVenueExtraLines(
+  items: Zotero.Item[],
+  venue: CCFVenue,
+): Promise<void> {
+  for (const item of items) {
+    try {
+      await writeVenueToExtra(item, venue);
+    } catch (error) {
+      // 只读文库等场景下降级为仅保留私有缓存结果。
+      ztoolkit.log("Could not persist CCF venue to item Extra", error);
+    }
+  }
+}
+
+async function removeVenueExtraLines(items: Zotero.Item[]): Promise<void> {
+  for (const item of items) {
+    try {
+      await removeVenueFromExtra(item);
+    } catch (error) {
+      ztoolkit.log("Could not remove CCF venue from item Extra", error);
+    }
+  }
 }
 
 async function selectManualVenue(win: Window) {
@@ -1131,6 +1163,8 @@ function appendCCFMenuSection(
       return;
     }
     clearItemStates(items);
+    // 恢复自动匹配时同步清掉 Extra 里的持久化线索，否则重算会再次命中。
+    void removeVenueExtraLines(items);
     refreshItemsView(items, "soft");
     alertUser(win, text.restoredDone(items.length));
   });
