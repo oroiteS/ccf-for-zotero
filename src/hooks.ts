@@ -1,6 +1,10 @@
 import { registerCASColumn } from "./modules/casColumn";
 import { registerCCFColumn } from "./modules/column";
 import { shutdownBackgroundWarmup, startBackgroundWarmup } from "./modules/backgroundWarmup";
+import {
+  queueInvalidationRecompute,
+  shutdownInvalidationRecompute,
+} from "./modules/invalidationRecompute";
 import { shutdownInitialization } from "./modules/initialization";
 import { invalidateCASItemStates } from "./modules/casStorage";
 import { registerRightClickMenu, registerToolsMenu } from "./modules/menu";
@@ -44,6 +48,7 @@ async function onMainWindowUnload(win: Window): Promise<void> {
 function onShutdown(): void {
   shutdownInitialization();
   shutdownBackgroundWarmup();
+  shutdownInvalidationRecompute();
   unregisterPreferencesPane();
   ztoolkit.unregisterAll();
   addon.data.alive = false;
@@ -60,6 +65,8 @@ async function onNotify(
   if (event !== "modify" || type !== "item" || ids.length === 0) return;
   invalidateItemStates(ids);
   invalidateCASItemStates(ids);
+  // 失效条目进入防抖后台队列自动重算，避免徽章停留在 Unknown 直到手动刷新。
+  queueInvalidationRecompute(ids);
 }
 
 async function onPrefsEvent(
