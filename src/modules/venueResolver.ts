@@ -105,6 +105,44 @@ function extractExtraVenues(extra: string): string[] {
   return venues;
 }
 
+// Zotero 的 arXiv translator 会把 arXiv 页面的 Comments 字段以 "Comments: ..."
+// 行的形式存进 Extra。ML 领域论文常在这里写接收声明，
+// 如 "Accepted as ICLR 2026 Oral"、"To appear in ICML 2025"。
+const extraCommentsPattern = /^\s*comments?\s*[:=]\s*(.+)$/i;
+const commentsExclusionPattern =
+  /\bunder\s+review\b|\bsubmitted\b|\brejected\b|\bwithdrawn\b|\bin\s+submission\b|\bunder\s+consideration\b/i;
+const commentsAcceptancePattern =
+  /\b(?:accepted|published|to\s+appear|appearing|forthcoming)\b\s+(?:as\s+|to\s+|at\s+|in\s+|by\s+|for\s+)?(?:an?\s+)?(?:conference\s+|journal\s+|workshop\s+)?(?:papers?\s+)?(?:at\s+|in\s+|to\s+|by\s+|for\s+)?\s*([^,;.()[\]\n]+)/i;
+const commentsPresentationSuffixPattern =
+  /\s+(?:orals?|spotlights?|posters?|papers?|talks?|highlights?|presentations?|contributions?)\s*$/i;
+
+/**
+ * 从 Extra 的 "Comments:" 行中提取接收/发表声明里的出版物名称。
+ * 只在存在明确接受措辞时产生候选，纯元信息（"17 pages, 3 figures"）
+ * 与未发表声明（"Under review at ..."）不会产生候选。
+ */
+function extractExtraCommentsVenueHints(extra: string): string[] {
+  if (!extra) return [];
+  const hints: string[] = [];
+  for (const line of extra.split(/\r?\n/)) {
+    const commentMatch = line.match(extraCommentsPattern);
+    if (!commentMatch?.[1]) continue;
+    const comment = commentMatch[1];
+    if (commentsExclusionPattern.test(comment)) continue;
+
+    const acceptanceMatch = comment.match(commentsAcceptancePattern);
+    if (!acceptanceMatch?.[1]) continue;
+
+    const phrase = acceptanceMatch[1]
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(commentsPresentationSuffixPattern, "")
+      .trim();
+    if (phrase) hints.push(phrase);
+  }
+  return hints;
+}
+
 function isPreprint(item: Zotero.Item): boolean {
   const fields = [
     "archiveID",
@@ -294,6 +332,10 @@ export function resolveVenueCandidates(item: Zotero.Item): VenueResolution {
 
   for (const venue of extractExtraVenues(getField(item, "extra"))) {
     addVenueField(candidates, venue, "extra");
+  }
+
+  for (const hint of extractExtraCommentsVenueHints(getField(item, "extra"))) {
+    addCandidate(candidates, hint, "extra:comments");
   }
 
   addIdentifierHints(candidates, item);

@@ -48,7 +48,7 @@ function makeItem(
 describe("local CCF matcher", () => {
   it("loads the CCF catalog", () => {
     assert.equal(getVenueCount(), 750);
-    assert.match(getMatcherVersion(), /^0\.1\.16/);
+    assert.match(getMatcherVersion(), /^0\.1\.18/);
   });
 
   const cases: Array<[string, string, string]> = [
@@ -101,6 +101,111 @@ describe("local CCF matcher", () => {
       assert.equal(result?.abbr, abbr);
     });
   }
+
+  it("strips published/accepted-as conference paper boilerplate prefixes", () => {
+    const cases: Array<[string, string]> = [
+      ["Published as a conference paper at ICLR 2023", "ICLR"],
+      ["published as a conference paper at International Conference on Learning Representations", "ICLR"],
+      ["Accepted as a conference paper at ACM MM 2023", "ACM MM"],
+      [
+        "Published in 2021 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)",
+        "CVPR",
+      ],
+    ];
+
+    for (const [input, abbr] of cases) {
+      const result = findVenue(input, "conference");
+      assert.equal(result?.status, "matched");
+      assert.equal(result?.abbr, abbr);
+    }
+  });
+
+  it("does not strip under-review boilerplate into a main-conference match", () => {
+    const result = findVenue(
+      "Under review as a conference paper at ICLR 2023",
+      "conference",
+    );
+    assert.equal(result, undefined);
+  });
+
+  it("matches boilerplate-prefixed ICLR strings even for journal-kind items", () => {
+    // 回归防护：v0.2.6 的 isShortCandidate kindMismatch 拒绝曾让
+    // journalArticle 类型条目里的短缩写 "ICLR" 匹配失败。
+    const result = matchCandidates(
+      [
+        {
+          value: "Published as a conference paper at ICLR 2023",
+          field: "publicationTitle",
+          kindHint: "journal",
+        },
+      ],
+      false,
+    );
+    assert.equal(result.status, "matched");
+    assert.equal(result.rank, "A");
+    assert.equal(result.abbr, "ICLR");
+  });
+
+  it("extracts acceptance statements from arXiv Comments lines in Extra", () => {
+    const cases: Array<[string, string]> = [
+      ["Comments: Accepted as ICLR 2026 Oral", "ICLR"],
+      ["Comments: Accepted as ICLR 2026 (Oral), 10 pages", "ICLR"],
+      ["Comments: Published as a conference paper at ICLR 2023", "ICLR"],
+      ["Comments: To appear in ICML 2025", "ICML"],
+      [
+        "Comments: Accepted by IEEE Transactions on Knowledge and Data Engineering",
+        "TKDE",
+      ],
+    ];
+
+    for (const [extra, abbr] of cases) {
+      const item = makeItem(
+        { extra, DOI: "10.48550/arXiv.2602.12116" },
+        "preprint",
+      );
+      const resolution = resolveVenueCandidates(item);
+      assert.ok(
+        resolution.candidates.some(
+          (candidate) => candidate.field === "extra:comments",
+        ),
+        `should extract a comments hint from: ${extra}`,
+      );
+      const result = matchCandidates(
+        resolution.candidates,
+        resolution.isPreprint,
+      );
+      assert.equal(result.status, "matched");
+      assert.equal(result.abbr, abbr);
+    }
+  });
+
+  it("does not treat descriptive or under-review Comments as venue hints", () => {
+    const cases = [
+      "Comments: 17 pages, 3 figures",
+      "Comments: Under review at ICLR 2026",
+      "Comments: Submitted to NeurIPS 2025",
+      "Comments: Dataset of 12k user sessions",
+    ];
+
+    for (const extra of cases) {
+      const item = makeItem(
+        { extra, DOI: "10.48550/arXiv.2602.12116" },
+        "preprint",
+      );
+      const resolution = resolveVenueCandidates(item);
+      assert.ok(
+        !resolution.candidates.some(
+          (candidate) => candidate.field === "extra:comments",
+        ),
+        `should not extract a comments hint from: ${extra}`,
+      );
+      const result = matchCandidates(
+        resolution.candidates,
+        resolution.isPreprint,
+      );
+      assert.equal(result.status, "preprint");
+    }
+  });
 
   it("matches CCF high-quality Chinese journals without prefix false positives", () => {
     const dzxb = findVenue("电子学报", "journal");

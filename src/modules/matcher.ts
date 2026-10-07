@@ -24,7 +24,7 @@ const data: CCFDataFile = {
   source: `${internationalData.source}; ${chineseJournalData.source}`,
   venues: [...internationalData.venues, ...chineseJournalData.venues],
 };
-const MATCHER_VERSION = "0.1.16-v2-cache-fingerprint";
+const MATCHER_VERSION = "0.1.18-arxiv-comments-venue-hints";
 
 const genericTokens = new Set([
   "acm",
@@ -111,6 +111,11 @@ function normalizeAbbr(value: string): string {
 
 function stripBoilerplate(value: string): string {
   let cleaned = value
+    // OpenReview/论文页眉式样板前缀（如 "Published as a conference paper at ICLR 2023"）。
+    // 注意：不要剥离 "workshop paper" 变体，workshop 标记必须保留给非主会防御逻辑。
+    .replace(/^published as a conference paper at\s+/i, "")
+    .replace(/^accepted as a (?:conference|regular) paper at\s+/i, "")
+    .replace(/^published in\s+/, "")
     .replace(/^proceedings of (the )?/i, "")
     .replace(/^proc\.? of (the )?/i, "")
     .replace(/^proc\.?\s*-\s*/i, "")
@@ -838,6 +843,9 @@ function describeCandidateMatch(
 ): string {
   if (candidate.field === "identifier:acl-anthology") {
     return `ACL Anthology DOI/URL 线索 + ${matcherMethod || "本地匹配"}`;
+  }
+  if (candidate.field === "extra:comments") {
+    return `Comments 接收声明 + ${matcherMethod || "本地匹配"}`;
   }
   if (candidate.field === "identifier:doi-prefix") {
     return `DOI 前缀线索 + ${matcherMethod || "本地匹配"}`;
