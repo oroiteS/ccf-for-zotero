@@ -10,7 +10,7 @@ export default defineConfig({
   updateURL:
     "https://github.com/oroiteS/ccf-for-zotero/releases/latest/download/update.json",
   xpiDownloadLink:
-    "https://github.com/oroiteS/ccf-for-zotero/releases/download/v{{version}}/{{xpiName}}.xpi",
+    "https://github.com/oroiteS/ccf-for-zotero/releases/download/v{{version}}/{{xpiName}}-{{version}}-zotero10.xpi",
 
   build: {
     assets: ["addon/**/*.*"],

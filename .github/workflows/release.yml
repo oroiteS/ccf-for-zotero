@@ -41,10 +41,7 @@ jobs:
           VERSION="${TAG_NAME#v}"
           mkdir -p release-assets
           cp .scaffold/build/ccf-for-zotero.xpi "release-assets/ccf-for-zotero-${VERSION}-zotero10.xpi"
-          cp .scaffold/build/ccf-for-zotero.xpi release-assets/ccf-for-zotero.xpi
           cp .scaffold/build/update.json release-assets/update.json
-          cp RELEASE_NOTES.md "release-assets/RELEASE_NOTES-${TAG_NAME}.md"
-          git archive --format=zip --output="release-assets/ccf-for-zotero-${TAG_NAME}-source.zip" HEAD
           echo "TAG_NAME=${TAG_NAME}" >> "$GITHUB_ENV"
 
       - name: Extract release notes for this tag
@@ -55,12 +52,12 @@ jobs:
             $0 == section { found = 1; next }
             /^## / && found { exit }
             found { print }
-          ' RELEASE_NOTES.md > "release-assets/RELEASE_NOTES-${TAG_NAME}.md"
-          if [[ ! -s "release-assets/RELEASE_NOTES-${TAG_NAME}.md" ]]; then
+          ' RELEASE_NOTES.md > ".scaffold/release-notes-${TAG_NAME}.md"
+          if [[ ! -s ".scaffold/release-notes-${TAG_NAME}.md" ]]; then
             echo "Release notes for ${TAG_NAME} not found in RELEASE_NOTES.md; see the full changelog file." \
-              > "release-assets/RELEASE_NOTES-${TAG_NAME}.md"
+              > ".scaffold/release-notes-${TAG_NAME}.md"
           fi
-          echo "NOTES_FILE=release-assets/RELEASE_NOTES-${TAG_NAME}.md" >> "$GITHUB_ENV"
+          echo "NOTES_FILE=.scaffold/release-notes-${TAG_NAME}.md" >> "$GITHUB_ENV"
 
       - name: Publish GitHub release
         env:
