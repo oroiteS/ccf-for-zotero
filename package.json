@@ -10,12 +10,12 @@
     "addonInstance": "CCFForZotero",
     "prefsPrefix": "extensions.ccf-for-zotero"
   },
-  "author": "nyaru177",
+  "author": "oroiteS",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nyaru177/ccf-for-zotero.git"
+    "url": "git+https://github.com/oroiteS/ccf-for-zotero.git"
   },
-  "homepage": "https://github.com/nyaru177/ccf-for-zotero#readme",
+  "homepage": "https://github.com/oroiteS/ccf-for-zotero#readme",
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "build": "node tools/build.mjs",

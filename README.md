@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nyaru177/ccf-for-zotero/releases/latest"><img src="https://img.shields.io/github/v/release/nyaru177/ccf-for-zotero?style=flat-square&label=release" alt="Latest release"></a>
-  <a href="https://github.com/nyaru177/ccf-for-zotero/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nyaru177/ccf-for-zotero/ci.yml?branch=v0.2-cas&style=flat-square&label=CI" alt="CI status"></a>
+  <a href="https://github.com/oroiteS/ccf-for-zotero/releases/latest"><img src="https://img.shields.io/github/v/release/oroiteS/ccf-for-zotero?style=flat-square&label=release" alt="Latest release"></a>
+  <a href="https://github.com/oroiteS/ccf-for-zotero/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/oroiteS/ccf-for-zotero/ci.yml?branch=main&style=flat-square&label=CI" alt="CI status"></a>
   <img src="https://img.shields.io/badge/Zotero-10.x-CC2936?style=flat-square&logo=zotero&logoColor=white" alt="Zotero 10">
-  <img src="https://img.shields.io/github/license/nyaru177/ccf-for-zotero?style=flat-square" alt="License">
+  <img src="https://img.shields.io/github/license/oroiteS/ccf-for-zotero?style=flat-square" alt="License">
 </p>
 
 当前版本：`0.2.8`
@@ -44,7 +44,7 @@
 
 ## 安装
 
-1. 前往 [Releases](https://github.com/nyaru177/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.8-zotero10.xpi`。
+1. 前往 [Releases](https://github.com/oroiteS/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.8-zotero10.xpi`。
 2. 打开 Zotero，进入 `工具` -> `插件`。
 3. 点击右上角齿轮，选择 `Install Add-on From File...`。
 4. 选择下载的 `.xpi` 文件，安装后重启 Zotero。
@@ -105,7 +105,7 @@ npm run audit:cas-catalog
 
 构建产物位于 `.scaffold/build/`。
 
-欢迎通过 [Issues](https://github.com/nyaru177/ccf-for-zotero/issues) 报告识别问题或提交改进建议。
+欢迎通过 [Issues](https://github.com/oroiteS/ccf-for-zotero/issues) 报告识别问题或提交改进建议。
 
 ## 致谢
 
