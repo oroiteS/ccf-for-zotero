@@ -9,6 +9,7 @@ import { shutdownInitialization } from "./modules/initialization";
 import { invalidateCASItemStates } from "./modules/casStorage";
 import { registerRightClickMenu, registerToolsMenu } from "./modules/menu";
 import { invalidateItemStates } from "./modules/storage";
+import { registerItemNotifier, unregisterItemNotifier } from "./modules/notifier";
 import {
   attachInitializationPreferences,
   registerPreferencesPane,
@@ -25,6 +26,11 @@ async function onStartup() {
 
   await registerPreferencesPane();
   await Promise.all([registerCCFColumn(), registerCASColumn()]);
+
+  // scaffold 的 bootstrap 不会把通知注册进 Zotero.Notifier，
+  // 这里自行接线：Connector/同步新增或修改条目后自动补算 CCF/CAS
+  // 缓存并刷新对应行，避免新条目一直显示 Unknown。
+  registerItemNotifier(onItemNotification);
 
   await Promise.all(
     Zotero.getMainWindows().map((win) => onMainWindowLoad(win)),
@@ -46,6 +52,7 @@ async function onMainWindowUnload(win: Window): Promise<void> {
 }
 
 function onShutdown(): void {
+  unregisterItemNotifier();
   shutdownInitialization();
   shutdownBackgroundWarmup();
   shutdownInvalidationRecompute();
@@ -56,7 +63,7 @@ function onShutdown(): void {
   delete Zotero[addon.data.config.addonInstance];
 }
 
-async function onNotify(
+async function onItemNotification(
   event: string,
   type: string,
   ids: Array<string | number>,
@@ -72,6 +79,17 @@ async function onNotify(
   // 列热路径只读缓存，新条目没有缓存就会一直显示 Unknown，
   // 直到重启触发新一轮预热；这里保证不重启也能自动补齐。
   queueInvalidationRecompute(ids);
+}
+
+async function onNotify(
+  event: string,
+  type: string,
+  ids: Array<string | number>,
+  extraData: { [key: string]: any },
+) {
+  // 保留 scaffold bootstrap 直接转发通知的兼容入口；与 notifier 模块
+  // 的注册共存是安全的：队列按 id 去重并防抖合并。
+  await onItemNotification(event, type, ids, extraData);
 }
 
 async function onPrefsEvent(

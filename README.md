@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/github/license/oroiteS/ccf-for-zotero?style=flat-square" alt="License">
 </p>
 
-当前版本：`0.2.10`
+当前版本：`0.2.11`
 
 ## 界面预览
 
@@ -44,7 +44,7 @@
 
 ## 安装
 
-1. 前往 [Releases](https://github.com/oroiteS/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.10-zotero10.xpi`。
+1. 前往 [Releases](https://github.com/oroiteS/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.11-zotero10.xpi`。
 2. 打开 Zotero，进入 `工具` -> `插件`。
 3. 点击右上角齿轮，选择 `Install Add-on From File...`。
 4. 选择下载的 `.xpi` 文件，安装后重启 Zotero。

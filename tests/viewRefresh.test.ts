@@ -97,4 +97,109 @@ describe("Zotero item view refresh helpers", () => {
       assert.equal(refreshCalls, 1);
     });
   });
+
+  it("falls back to whole-tree invalidate when targeted rows are unavailable", () => {
+    // 目标行不在当前视图（例如 Connector 保存到其它集合后定向失效失败）
+    // 时，必须退化为整树轻量失效，否则行会停留在 Unknown。
+    let treeInvalidated = 0;
+    const itemsView = {
+      getRowIndexByID() {
+        return false;
+      },
+      tree: {
+        invalidateRow() {
+          throw new Error("row lookup failed, should not be called");
+        },
+        invalidate() {
+          treeInvalidated += 1;
+        },
+      },
+    };
+
+    withZoteroItemsView(itemsView, () => {
+      assert.equal(softRefreshItemsView([4242]), true);
+      assert.equal(treeInvalidated, 1);
+    });
+  });
+
+  it("clears the ItemTree row data cache before invalidating rows", () => {
+    // 行显示数据（含自定义列 dataProvider 结果）缓存在 itemsView._rowCache，
+    // Zotero 只在 item modify/refresh 通知时清除。插件刷新私有缓存后若不
+    // 主动清除，invalidateRow 会用旧数据重绘，列停留在 Unknown。
+    const rowCache: Record<number, string> = { 42: "Unknown" };
+    const invalidatedRows: number[] = [];
+    let cacheClearedAll: boolean | undefined;
+    const itemsView = {
+      getRowIndexByID(id: string | number) {
+        return String(id) === "42" ? 3 : false;
+      },
+      invalidateRowCache(ids: number[] | true) {
+        if (ids === true) {
+          cacheClearedAll = true;
+          return;
+        }
+        for (const id of ids) delete rowCache[id];
+      },
+      tree: {
+        invalidateRow(rowIndex: number) {
+          invalidatedRows.push(rowIndex);
+        },
+      },
+    };
+
+    withZoteroItemsView(itemsView, () => {
+      assert.equal(invalidateItemRows([42]), true);
+      assert.deepEqual(invalidatedRows, [3]);
+      assert.equal(42 in rowCache, false, "row cache entry must be cleared");
+      assert.equal(cacheClearedAll, undefined, "targeted path must not clear the whole cache");
+    });
+  });
+
+  it("falls back to manual _rowCache clearing on Zotero 7 without invalidateRowCache", () => {
+    const rowCache: Record<number, string> = { 7: "Unknown" };
+    const itemsView = {
+      getRowIndexByID(id: string | number) {
+        return String(id) === "7" ? 0 : false;
+      },
+      get _rowCache() {
+        return rowCache;
+      },
+      set _rowCache(value: Record<number, string>) {
+        Object.keys(rowCache).forEach((key) => delete rowCache[Number(key)]);
+        Object.assign(rowCache, value);
+      },
+      tree: {
+        invalidateRow() {},
+      },
+    };
+
+    withZoteroItemsView(itemsView, () => {
+      assert.equal(invalidateItemRows([7]), true);
+      assert.equal(7 in rowCache, false);
+    });
+  });
+
+  it("clears the whole row cache before the whole-tree fallback invalidate", () => {
+    let clearedAll = false;
+    let treeInvalidated = 0;
+    const itemsView = {
+      getRowIndexByID() {
+        return false;
+      },
+      invalidateRowCache(ids: number[] | true) {
+        if (ids === true) clearedAll = true;
+      },
+      tree: {
+        invalidate() {
+          treeInvalidated += 1;
+        },
+      },
+    };
+
+    withZoteroItemsView(itemsView, () => {
+      assert.equal(softRefreshItemsView([4242]), true);
+      assert.equal(clearedAll, true, "whole-tree fallback must clear the row cache");
+      assert.equal(treeInvalidated, 1);
+    });
+  });
 });
