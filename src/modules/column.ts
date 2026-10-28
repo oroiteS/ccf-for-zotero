@@ -102,8 +102,12 @@ export function formatColumnDataForState(state: ItemRankState): string {
     const displayVenue = formatNonCcfVenueText(originalVenue);
     display = `CCF None | ${displayVenue}`;
     title = buildTooltip(state, `CCF None | ${originalVenue}`);
-  } else if (state.rank && state.abbr) {
-    display = `CCF ${state.rank} | ${state.abbr}`;
+  } else if (state.rank) {
+    // 目录中不少期刊（如 Neural Networks、Neural Computation）没有官方简称，
+    // abbr 为空不代表识别失败；依次回退全称/来源文本，避免把已命中的条目
+    // 误显示为 Unknown（识别诊断与列渲染必须保持一致）。
+    const venueName = state.abbr || state.fullName || state.venueText || "";
+    display = venueName ? `CCF ${state.rank} | ${venueName}` : `CCF ${state.rank}`;
   } else {
     display = "Unknown";
   }

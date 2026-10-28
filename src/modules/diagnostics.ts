@@ -48,7 +48,7 @@ function formatEvidence(result: MatchResult): string[] {
 function formatResult(result: MatchResult): string {
   if (result.status === "matched") {
     return [
-      `结果：CCF ${result.rank} | ${result.abbr}`,
+      `结果：CCF ${result.rank} | ${result.abbr || result.fullName || result.venueText || "n/a"}`,
       `全称：${result.fullName || "n/a"}`,
       `分类：${result.category || "n/a"}`,
       `来源文本：${result.venueText || "n/a"}`,

@@ -223,7 +223,7 @@ export function venueToManualResult(venue: CCFVenue): MatchResult {
     abbr: venue.abbr,
     fullName: venue.fullName,
     category: venue.category,
-    venueText: venue.abbr,
+    venueText: venue.abbr || venue.fullName,
     confidence: 1,
   };
 }
