@@ -100,4 +100,50 @@ describe("CCF column display formatting", () => {
 
     assert.equal(display, "Unknown");
   });
+
+  it("appends the publication year to the display without affecting sort keys", () => {
+    const packed = formatColumnDataForState(
+      buildState({
+        abbr: "AAAI",
+        fullName: "AAAI Conference on Artificial Intelligence",
+        venueText: "AAAI",
+      }),
+      { year: 2026 },
+    );
+    const { display, title, sortKey } = unpackColumnData(packed);
+
+    assert.equal(display, "CCF B | AAAI 2026");
+    assert.ok(title.startsWith("CCF B | AAAI 2026"));
+    // 排序键仍基于不带年份的 venue 名，追加年份不改变排序行为。
+    assert.ok(sortKey.startsWith("020"));
+    assert.ok(!sortKey.includes("2026"));
+
+    const noAbbr = unpackColumnData(
+      formatColumnDataForState(
+        buildState({ abbr: "", fullName: "Neural Networks", venueText: "Neural Networks" }),
+        { year: "2026" },
+      ),
+    );
+    assert.equal(noAbbr.display, "CCF B | Neural Networks 2026");
+    assert.ok(noAbbr.sortKey.startsWith("020"));
+  });
+
+  it("skips the year suffix when the venue text already ends with the same year", () => {
+    const packed = formatColumnDataForState(
+      buildState({ abbr: "", fullName: "", venueText: "AAAI 2026" }),
+      { year: "2026" },
+    );
+    const { display } = unpackColumnData(packed);
+
+    assert.equal(display, "CCF B | AAAI 2026");
+  });
+
+  it("ignores invalid year values", () => {
+    const packed = formatColumnDataForState(buildState({ abbr: "AAAI" }), {
+      year: "abc",
+    });
+    const { display } = unpackColumnData(packed);
+
+    assert.equal(display, "CCF B | AAAI");
+  });
 });

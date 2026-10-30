@@ -39,4 +39,27 @@ describe("CCF item diagnostics", () => {
 
     assert.ok(report.includes("结果：CCF B | TNNLS"));
   });
+
+  it("appends the item year to the result line and lists the date field", () => {
+    const item = fakeJournalArticle({
+      publicationTitle: "Proceedings of the AAAI Conference on Artificial Intelligence",
+      date: "2026-04-13 2026-04-13",
+    });
+
+    const report = formatItemDiagnostics(item);
+
+    assert.ok(report.includes("结果：CCF A | AAAI 2026"));
+    assert.ok(report.includes("- date: 2026-04-13 2026-04-13"));
+  });
+
+  it("omits the year suffix when the item has no date field", () => {
+    const item = fakeJournalArticle({
+      publicationTitle: "Proceedings of the AAAI Conference on Artificial Intelligence",
+    });
+
+    const report = formatItemDiagnostics(item);
+
+    assert.ok(report.includes("结果：CCF A | AAAI\n"));
+    assert.ok(!report.includes("AAAI 2026"));
+  });
 });

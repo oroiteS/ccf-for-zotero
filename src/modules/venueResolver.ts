@@ -1,4 +1,5 @@
-import { CCFKind, VenueCandidate, VenueResolution } from "./types";
+import { matchCandidates } from "./matcher";
+import { CCFKind, MatchResult, VenueCandidate, VenueResolution } from "./types";
 
 const inputFingerprintFields = [
   "title",
@@ -30,6 +31,7 @@ function addCandidate(
   field: string,
   kindHint?: CCFKind,
   context?: string,
+  yearHint?: string,
 ) {
   const trimmed = value.trim();
   if (!trimmed) return;
@@ -40,7 +42,18 @@ function addCandidate(
   ) {
     return;
   }
-  candidates.push({ value: trimmed, field, kindHint, context });
+  candidates.push({ value: trimmed, field, kindHint, context, yearHint });
+}
+
+/**
+ * 通用文本解析：venue 线索末尾的独立 4 位年份（如 "ICML 2026"、"AAAI 2026"）。
+ * 这不是 per-venue 规则——目录里存的是 "AAAI"，带年份的文本按去掉年份的
+ * venue 名匹配，年份作为独立信号透传到结果显示，绝不参与 venue 推断。
+ */
+function splitTrailingYear(value: string): { venue: string; year?: string } {
+  const match = value.match(/^(.+?)\s+((?:19|20)\d{2})$/);
+  if (!match) return { venue: value };
+  return { venue: match[1].trim(), year: match[2] };
 }
 
 function hasWorkshopMarker(value: string): boolean {
@@ -81,17 +94,30 @@ function addVenueField(
 ) {
   const trimmed = value.trim();
   if (!trimmed) return;
+  const { venue: withoutYear, year } = splitTrailingYear(trimmed);
 
   if (!hasWorkshopMarker(trimmed)) {
     for (const abbr of [
       ...extractBracketAbbr(trimmed),
       ...extractTrailingAbbr(trimmed),
     ]) {
-      addCandidate(candidates, abbr, `${field}:abbr`, kindHint, trimmed);
+      addCandidate(candidates, abbr, `${field}:abbr`, kindHint, trimmed, year);
     }
   }
 
-  addCandidate(candidates, trimmed, field, kindHint);
+  // 原值候选在前（保持既有匹配行为），去年份候选兜底精确匹配；
+  // 两个候选都携带年份信号，无论哪个命中，年份都跟随结果。
+  addCandidate(candidates, trimmed, field, kindHint, undefined, year);
+  if (year && withoutYear && withoutYear !== trimmed) {
+    addCandidate(
+      candidates,
+      withoutYear,
+      `${field}:year`,
+      kindHint,
+      trimmed,
+      year,
+    );
+  }
 }
 
 function extractExtraVenues(extra: string): string[] {
@@ -262,6 +288,34 @@ function addIdentifierHints(candidates: VenueCandidate[], item: Zotero.Item) {
   for (const prefix of extractDoiVenuePrefix(identifierText)) {
     addCandidate(candidates, prefix, "identifier:doi-prefix");
   }
+}
+
+/**
+ * 从 Extra 的 venue 标注行（"CCF Venue: AAAI 2027"）提取条目级年份。
+ * 年份是用户手动标注的信号，独立于"哪个候选命中"——条目可能同时有
+ * publicationTitle 等更早命中的候选，年份不能依赖命中候选携带。
+ */
+export function extractAnnotatedVenueYear(
+  extra: string,
+): string | undefined {
+  for (const venue of extractExtraVenues(extra)) {
+    const { year } = splitTrailingYear(venue.trim());
+    if (year) return year;
+  }
+  return undefined;
+}
+
+/**
+ * 完整的条目匹配：venue 解析 → 目录匹配 → 合并条目级年份标注。
+ * 列缓存重算与诊断实时计算都必须走这里，保证两者看到一致的结果。
+ */
+export function resolveItemMatch(item: Zotero.Item): MatchResult {
+  const resolution = resolveVenueCandidates(item);
+  const result = matchCandidates(resolution.candidates, resolution.isPreprint);
+  // 手动标注年份（Extra venue 行）最权威，优先于命中候选自带的年份。
+  const annotatedYear = extractAnnotatedVenueYear(getField(item, "extra"));
+  if (annotatedYear) return { ...result, year: annotatedYear };
+  return result;
 }
 
 export function resolveVenueCandidates(item: Zotero.Item): VenueResolution {

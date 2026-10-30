@@ -764,6 +764,9 @@ export function matchCandidates(
       }
       return {
         ...match,
+        year: candidate.yearHint,
+        // preprint 条目的 Date 是提交日，与录取届次无关，标记供显示层抑制 date 兜底。
+        preprintSignal: isPreprint || undefined,
         matchedField: candidate.field,
         matchedValue: candidate.value,
         matchMethod: describeCandidateMatch(candidate, match.matchMethod),
@@ -791,6 +794,7 @@ export function matchCandidates(
       matchedField: firstVenue.field,
       matchedValue: firstVenue.value,
       matchMethod: "有明确 venue，但未命中 CCF 目录",
+      preprintSignal: isPreprint || undefined,
     };
   }
 

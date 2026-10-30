@@ -1,12 +1,20 @@
 import { getCatalogVersion, getMatcherVersion, matchCandidates } from "./matcher";
-import { resolveVenueCandidates } from "./venueResolver";
+import { resolveItemMatch } from "./venueResolver";
 import {
   getItemKey,
   getStoredState,
   saveMatchResult,
   saveMatchResults,
 } from "./storage";
-import { ItemRankState, MatchResult } from "./types";
+import { ITEM_STATE_VERSION, ItemRankState, MatchResult } from "./types";
+
+/**
+ * 条目状态结构的 schema 版本（常量定义在 types.ts，storage 落盘共用）。
+ * 显示逻辑新增字段（如 matchYear、preprintSignal）时递增；旧版本缓存
+ * 会被 warmup / 失效重算自动迁移，避免升级插件后列表一直读旧缓存
+ * （如 date 兜底年份）而诊断却是新结果。
+ */
+export { ITEM_STATE_VERSION };
 
 export interface GetDisplayStateOptions {
   computeIfMissing?: boolean;
@@ -49,8 +57,7 @@ export interface FilterItemsByDisplayStatusResult {
 }
 
 export function resolveItemRank(item: Zotero.Item): MatchResult {
-  const resolution = resolveVenueCandidates(item);
-  return matchCandidates(resolution.candidates, resolution.isPreprint);
+  return resolveItemMatch(item);
 }
 
 export function getDisplayState(
@@ -94,6 +101,19 @@ export function hasCachedRankState(item: Zotero.Item): boolean {
   );
 }
 
+/**
+ * 该条目是否需要（重新）计算匹配缓存：完全无缓存，或缓存结构版本低于
+ * 当前实现（旧缓存缺新年份通道字段，显示会退化为 date 兜底）。warmup
+ * 与失效重算应使用本函数替代 hasCachedRankState，保证升级后旧缓存迁移。
+ */
+export function needsRankRecompute(item: Zotero.Item): boolean {
+  const stored = getStoredState(item, { validateInputFingerprint: false });
+  if (!stored) return true;
+  // 手动指定/忽略状态是用户意志，永不被自动重算覆盖。
+  if (stored.source === "manual") return false;
+  return (stored.stateVersion ?? 1) < ITEM_STATE_VERSION;
+}
+
 function toItemRankState(item: Zotero.Item, result: MatchResult): ItemRankState {
   return {
     itemKey: getItemKey(item),
@@ -108,6 +128,9 @@ function toItemRankState(item: Zotero.Item, result: MatchResult): ItemRankState 
     matchedField: result.matchedField,
     matchedValue: result.matchedValue,
     matchMethod: result.matchMethod,
+    matchYear: result.year,
+    preprintSignal: result.preprintSignal,
+    stateVersion: ITEM_STATE_VERSION,
     catalogVersion: getCatalogVersion(),
     matcherVersion: getMatcherVersion(),
     updatedAt: new Date().toISOString(),

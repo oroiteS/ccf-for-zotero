@@ -1,6 +1,6 @@
 import { config } from "../../package.json";
 import { getCatalogVersion, getMatcherVersion } from "./matcher";
-import { ItemRankState, MatchResult } from "./types";
+import { ITEM_STATE_VERSION, ItemRankState, MatchResult } from "./types";
 import { getItemInputFingerprint } from "./venueResolver";
 import { readJSONPreference, writeJSONPreference } from "./preferenceStore";
 
@@ -122,6 +122,11 @@ export function saveMatchResults(
       matchedField: result.matchedField,
       matchedValue: result.matchedValue,
       matchMethod: result.matchMethod,
+      // 年份通道字段必须落盘：丢了它们，列显示会退化为 date 兜底年份，
+      // 而诊断（实时计算）却是正确结果——两者不一致的根源就在这里。
+      matchYear: result.year,
+      preprintSignal: result.preprintSignal,
+      stateVersion: ITEM_STATE_VERSION,
       catalogVersion,
       matcherVersion,
       updatedAt,

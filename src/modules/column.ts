@@ -86,7 +86,55 @@ function buildTooltip(state: ItemRankState, display: string): string {
   return lines.slice(0, 4).join("\n");
 }
 
-export function formatColumnDataForState(state: ItemRankState): string {
+export interface FormatColumnOptions {
+  /** 条目 Date 字段年份，仅作兜底；venue 标注年份（state.matchYear）优先。 */
+  year?: string | number;
+}
+
+/**
+ * 读取条目 Date 字段中的 4 位年份（会议论文即 proceedings 年份，通常等于
+ * 录取年份）。只读单个字段，属于列渲染热路径可接受的开销；不写入缓存，
+ * 因此修改日期后无需重建匹配缓存即可直接反映到列上。
+ */
+export function getItemPublicationYear(item: Zotero.Item): string | undefined {
+  let raw = "";
+  try {
+    raw = String(item?.getField?.("date") ?? "").trim();
+    if (!raw) return undefined;
+    const parsed = (Zotero as any)?.Date?.strToDate?.(raw);
+    const parsedYear = String(parsed?.year ?? "").trim();
+    if (/^\d{4}$/.test(parsedYear)) return parsedYear;
+  } catch (error) {
+    // Zotero 全局不可用（单元测试）或字段读取失败时走正则兜底。
+  }
+  const match = raw.match(/\d{4}/);
+  return match ? match[0] : undefined;
+}
+
+function normalizeYear(value?: string | number): string | undefined {
+  const text = String(value ?? "").trim();
+  return /^\d{4}$/.test(text) ? text : undefined;
+}
+
+function appendYearSuffix(text: string, year?: string): string {
+  if (!year || !text) return text;
+  // venueText 本身已含同年份（如 "AAAI 2026"）时避免重复追加。
+  if (new RegExp(`(^|\\s)${year}$`).test(text)) return text;
+  return `${text} ${year}`;
+}
+
+export function formatColumnDataForState(
+  state: ItemRankState,
+  options: FormatColumnOptions = {},
+): string {
+  // 年份依据优先级：venue 标注年份（extra/proceedings 自带，语义可靠）
+  // 优先于条目 Date 字段（会议条目的 Date 可能是提交日/剪藏日，语义不可靠）。
+  // preprint 条目的 Date 是提交日，与录取届次必然无关，直接不参与兜底——
+  // 此时唯一可信来源是手动标注（如 "CCF Venue: AAAI 2027"），没有就不显示。
+  const dateYear = normalizeYear(options.year);
+  const year =
+    normalizeYear(state.matchYear) ||
+    (state.preprintSignal ? undefined : dateYear);
   let display = "";
   let title = "";
 
@@ -101,7 +149,10 @@ export function formatColumnDataForState(state: ItemRankState): string {
     const originalVenue = state.venueText || "Venue";
     const displayVenue = formatNonCcfVenueText(originalVenue);
     display = `CCF None | ${displayVenue}`;
-    title = buildTooltip(state, `CCF None | ${originalVenue}`);
+    title = buildTooltip(
+      state,
+      appendYearSuffix(`CCF None | ${originalVenue}`, year),
+    );
   } else if (state.rank) {
     // 目录中不少期刊（如 Neural Networks、Neural Computation）没有官方简称，
     // abbr 为空不代表识别失败；依次回退全称/来源文本，避免把已命中的条目
@@ -112,8 +163,11 @@ export function formatColumnDataForState(state: ItemRankState): string {
     display = "Unknown";
   }
 
-  if (!title) title = buildTooltip(state, display);
-  return packColumnData(getSortKey(state, display), display, title);
+  // 排序键继续使用不带年份的 display，保证追加年份不改变既有排序行为；
+  // 徽章展示文本追加年份（如 "CCF A | AAAI 2026"）。
+  const displayWithYear = appendYearSuffix(display, year);
+  if (!title) title = buildTooltip(state, displayWithYear);
+  return packColumnData(getSortKey(state, display), displayWithYear, title);
 }
 
 function getBadgeColors(text: string) {
@@ -149,12 +203,14 @@ export async function registerCCFColumn() {
     pluginID: config.addonID,
     dataKey,
     label: "CCF",
-    width: "130",
+    width: "160",
     zoteroPersist: ["width", "hidden", "sortDirection"],
     dataProvider: (item: Zotero.Item) => {
       if (!item || item.isAttachment() || item.isNote()) return "";
       try {
-        return formatColumnDataForState(getColumnDisplayState(item));
+        return formatColumnDataForState(getColumnDisplayState(item), {
+          year: getItemPublicationYear(item),
+        });
       } catch (error) {
         ztoolkit.log("CCF column dataProvider failed", error);
         return formatColumnDataForState({

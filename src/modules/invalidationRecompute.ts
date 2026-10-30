@@ -5,7 +5,7 @@ import {
   refreshCASItems,
 } from "./casService";
 import {
-  hasCachedRankState,
+  needsRankRecompute,
   refreshItemsRank,
 } from "./rankService";
 import { softRefreshItemsView } from "./viewRefresh";
@@ -225,7 +225,10 @@ export async function runInvalidationRecomputeNow(): Promise<InvalidationRecompu
   if (ids.length === 0) return emptyResult;
 
   const items = collectItemsFromIDs(new Set(ids));
-  const ccfItems = items.filter((item) => !hasCachedRankState(item));
+  // needsRankRecompute 同时覆盖：失效条目（无缓存）与旧版本缓存条目；
+  // 后者保证插件升级后旧缓存自动迁移出新年份通道字段，而不是永远
+  // 停留在 date 兜底显示（诊断实时计算与列表缓存不一致的根源）。
+  const ccfItems = items.filter((item) => needsRankRecompute(item));
   const casItems = hasBundledCASSnapshot()
     ? items.filter((item) => !hasCachedCASState(item))
     : [];

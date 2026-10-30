@@ -1,7 +1,8 @@
 import { matchCandidates } from "./matcher";
 import { formatNonCcfVenueText } from "./nonCcfAliases";
+import { getItemPublicationYear } from "./column";
 import { MatchResult, VenueCandidate } from "./types";
-import { resolveVenueCandidates } from "./venueResolver";
+import { resolveItemMatch, resolveVenueCandidates } from "./venueResolver";
 
 const inspectedFields = [
   "title",
@@ -10,6 +11,7 @@ const inspectedFields = [
   "conferenceName",
   "journalAbbreviation",
   "seriesTitle",
+  "date",
   "DOI",
   "url",
   "extra",
@@ -21,6 +23,9 @@ export interface ItemDiagnostics {
   candidates: VenueCandidate[];
   isPreprint: boolean;
   result: MatchResult;
+  year?: string;
+  /** 年份依据来源：venue 标注（可靠）或条目 Date 字段（兜底）。 */
+  yearSource?: "venue" | "date";
 }
 
 function getField(item: Zotero.Item, field: string): string {
@@ -45,10 +50,20 @@ function formatEvidence(result: MatchResult): string[] {
   return lines;
 }
 
-function formatResult(result: MatchResult): string {
+function appendYearSuffix(text: string, year?: string): string {
+  if (!year || !text) return text;
+  // venue 文本本身已含同年份（如 "AAAI 2026"）时避免重复追加。
+  if (new RegExp(`(^|\\s)${year}$`).test(text)) return text;
+  return `${text} ${year}`;
+}
+
+function formatResult(result: MatchResult, year?: string): string {
   if (result.status === "matched") {
     return [
-      `结果：CCF ${result.rank} | ${result.abbr || result.fullName || result.venueText || "n/a"}`,
+      `结果：${appendYearSuffix(
+        `CCF ${result.rank} | ${result.abbr || result.fullName || result.venueText || "n/a"}`,
+        year,
+      )}`,
       `全称：${result.fullName || "n/a"}`,
       `分类：${result.category || "n/a"}`,
       `来源文本：${result.venueText || "n/a"}`,
@@ -60,7 +75,10 @@ function formatResult(result: MatchResult): string {
   if (result.status === "none") {
     const venueText = result.venueText || "n/a";
     return [
-      `结果：CCF None | ${formatNonCcfVenueText(venueText)}`,
+      `结果：${appendYearSuffix(
+        `CCF None | ${formatNonCcfVenueText(venueText)}`,
+        year,
+      )}`,
       `来源文本：${venueText}`,
       ...formatEvidence(result),
       `置信度：${formatConfidence(result)}`,
@@ -107,7 +125,14 @@ function explainResult(diagnostics: ItemDiagnostics): string {
 }
 
 export function getItemDiagnostics(item: Zotero.Item): ItemDiagnostics {
+  // 与列缓存重算走同一入口（resolveItemMatch），保证诊断与列表显示一致。
+  const result = resolveItemMatch(item);
   const resolution = resolveVenueCandidates(item);
+  // 与列显示保持同一优先级：venue 标注年份优先；preprint 条目的 Date 是
+  // 提交日，与录取届次无关，不参与兜底。
+  const dateYear = getItemPublicationYear(item);
+  const dateUsable = !result.preprintSignal;
+  const year = result.year || (dateUsable ? dateYear : undefined);
   return {
     itemType: item.itemType,
     fields: inspectedFields
@@ -115,7 +140,13 @@ export function getItemDiagnostics(item: Zotero.Item): ItemDiagnostics {
       .filter((entry) => entry.value),
     candidates: resolution.candidates,
     isPreprint: resolution.isPreprint,
-    result: matchCandidates(resolution.candidates, resolution.isPreprint),
+    result,
+    year,
+    yearSource: result.year
+      ? "venue"
+      : dateUsable && dateYear
+        ? "date"
+        : undefined,
   };
 }
 
@@ -150,7 +181,18 @@ export function formatItemDiagnostics(item: Zotero.Item): string {
     lines.push("- 无候选 venue");
   }
 
-  lines.push("", "最终判定：", formatResult(diagnostics.result));
+  lines.push("", "最终判定：", formatResult(diagnostics.result, diagnostics.year));
+  if (diagnostics.year) {
+    const source =
+      diagnostics.yearSource === "venue"
+        ? "venue 标注年份"
+        : "条目 Date 字段";
+    lines.push(`显示年份：${diagnostics.year}（来源：${source}）`);
+  } else if (diagnostics.result.preprintSignal) {
+    lines.push(
+      "显示年份：无（preprint 条目的 Date 是提交日期，不代表录取届次；请在 Extra 的 venue 标注中补年份，如 CCF Venue: AAAI 2027）",
+    );
+  }
   lines.push("", explainResult(diagnostics));
 
   return lines.join("\n");

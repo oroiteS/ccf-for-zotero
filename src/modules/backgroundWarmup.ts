@@ -5,7 +5,7 @@ import {
   refreshCASItems,
 } from "./casService";
 import {
-  hasCachedRankState,
+  needsRankRecompute,
   refreshItemsRank,
 } from "./rankService";
 import { getActiveViewIdentity, softRefreshItemsView } from "./viewRefresh";
@@ -208,7 +208,9 @@ async function runWarmup(win: Window, job: BackgroundWarmupJob) {
   if (!isCurrentJob(job)) return;
   if (isInitializationRunning()) return;
   const candidates = collectWarmupItems();
-  const ccfItems = candidates.filter((item) => !hasCachedRankState(item));
+  // 无缓存的条目 + 旧版本缓存条目都需要准备/迁移，保证插件升级后
+  // 可见条目的旧缓存被新年份通道重写。
+  const ccfItems = candidates.filter((item) => needsRankRecompute(item));
   const casItems = hasBundledCASSnapshot()
     ? candidates.filter((item) => !hasCachedCASState(item))
     : [];

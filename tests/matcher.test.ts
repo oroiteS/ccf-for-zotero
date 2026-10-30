@@ -22,6 +22,8 @@ import {
   filterItemsByDisplayStatus,
   getColumnDisplayState,
   getDisplayState,
+  ITEM_STATE_VERSION,
+  needsRankRecompute,
   refreshItemsRank,
 } from "../src/modules/rankService";
 import { clearStorageMemoryCache, getStoredState } from "../src/modules/storage";
@@ -927,6 +929,89 @@ describe("local CCF matcher", () => {
       assert.equal(state.status, "matched");
       assert.equal(state.rank, "B");
       assert.equal(state.abbr, "IPM");
+    } finally {
+      clearStorageMemoryCache();
+      (globalThis as any).Zotero = originalZotero;
+    }
+  });
+
+  it("writes the current state version and re-computes legacy cache entries", async () => {
+    // 升级场景回归：旧版插件写入的缓存没有 stateVersion（也没有 matchYear
+    // 等新年份通道字段）。重算路径必须把这种条目视为需要重算，否则升级后
+    // 列表一直读旧缓存（date 兜底年份），而诊断实时计算却是新结果。
+    const legacyItem = makeItem({}, "conferencePaper", 121);
+    const freshItem = makeItem({}, "conferencePaper", 122);
+    const rawStore = JSON.stringify({
+      version: 1,
+      items: {
+        "1:121": {
+          itemKey: "1:121",
+          status: "matched",
+          source: "auto",
+          rank: "A",
+          abbr: "AAAI",
+          catalogVersion: getCatalogVersion(),
+          matcherVersion: getMatcherVersion(),
+          inputFingerprint: getItemInputFingerprint(legacyItem),
+          updatedAt: "2026-08-24T00:00:00.000Z",
+          // 无 stateVersion —— 旧版插件写入的缓存。
+        },
+        "1:122": {
+          itemKey: "1:122",
+          status: "matched",
+          source: "auto",
+          rank: "A",
+          abbr: "AAAI",
+          stateVersion: ITEM_STATE_VERSION,
+          catalogVersion: getCatalogVersion(),
+          matcherVersion: getMatcherVersion(),
+          inputFingerprint: getItemInputFingerprint(freshItem),
+          updatedAt: "2026-08-24T00:00:00.000Z",
+        },
+      },
+    });
+
+    const originalZotero = (globalThis as any).Zotero;
+    (globalThis as any).Zotero = {
+      Prefs: {
+        get() {
+          return rawStore;
+        },
+        set() {},
+      },
+    };
+
+    try {
+      clearStorageMemoryCache();
+      assert.equal(needsRankRecompute(legacyItem), true);
+      assert.equal(needsRankRecompute(freshItem), false);
+
+      // 新写入的缓存必须携带当前版本号，否则下次升级还会被误判为待迁移。
+      let savedStore = "";
+      (globalThis as any).Zotero = {
+        Prefs: {
+          get() {
+            return "";
+          },
+          set(_key: string, value: string) {
+            savedStore = value;
+          },
+        },
+      };
+      clearStorageMemoryCache();
+      const item = makeItem(
+        {
+          publicationTitle: "Information Processing & Management",
+          extra: "CCF Venue: IPM 2026",
+        },
+        "journalArticle",
+        123,
+      );
+      await refreshItemsRank([item]);
+      const saved = JSON.parse(savedStore).items["1:123"];
+      assert.equal(saved.stateVersion, ITEM_STATE_VERSION);
+      // 年份通道字段必须真实落盘，否则列显示退化为 date 兜底。
+      assert.equal(saved.matchYear, "2026");
     } finally {
       clearStorageMemoryCache();
       (globalThis as any).Zotero = originalZotero;
