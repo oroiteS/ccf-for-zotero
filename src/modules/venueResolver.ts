@@ -122,9 +122,10 @@ function addVenueField(
 
 function extractExtraVenues(extra: string): string[] {
   const venues: string[] = [];
-  // "ccf venue" 是右键手动设置自动写入的持久化线索（见 extraVenue.ts）。
+  // "ccf venue" 是右键手动设置自动写入的持久化线索（见 extraVenue.ts）；
+  // "ccf" 单独作前缀（如 "CCF: AAAI"）是用户手写的等价简写。
   const pattern =
-    /^\s*(venue|conference|journal|booktitle|proceedings|publication|ccf\s+venue)\s*[:=]\s*(.+)$/i;
+    /^\s*(venue|conference|journal|booktitle|proceedings|publication|ccf\s+venue|ccf)\s*[:=]\s*(.+)$/i;
   for (const line of extra.split(/\r?\n/)) {
     const match = line.match(pattern);
     if (match?.[2]) venues.push(match[2]);
@@ -184,8 +185,28 @@ function isPreprint(item: Zotero.Item): boolean {
   );
 }
 
-function unique(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))];
+// Extra 是万金油字段：arXiv 行、页数说明、链接、其他插件的标注混在一起。
+// 裸行（无 key 的短行）允许用户直接写会议/期刊名（如 "AAAI"、"NAACL 2025"），
+// 但只能作兜底候选，且匹配端只接受精确命中目录（见 matcher 的 bare-line 限制），
+// 防止 "ICLR submission" 这类投稿/未录用文本被开头简称匹配误吃。
+const bareLineExclusionPattern =
+  /^\s*(venue|conference|journal|booktitle|proceedings|publication|ccf\s+venue|ccf|comments?|doi|issn|eissn|url|arxiv|isbn|pmid|citation\s+key|gs\s*rank|jcr|core)\s*[:=]/i;
+const bareLineMaxChars = 150;
+
+function isBareVenueLineCandidate(line: string): boolean {
+  if (!line || line.length > bareLineMaxChars) return false;
+  if (bareLineExclusionPattern.test(line)) return false;
+  if (/https?:\/\//i.test(line)) return false;
+  return true;
+}
+
+function extractBareExtraVenueLines(extra: string): string[] {
+  const lines: string[] = [];
+  for (const rawLine of extra.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (isBareVenueLineCandidate(line)) lines.push(line);
+  }
+  return lines;
 }
 
 function stableHash(value: string): string {
@@ -217,8 +238,20 @@ function extractDoiVenuePrefix(value: string): string[] {
     .filter((prefix) => prefix.length >= 3);
 }
 
-function extractAclAnthologyHints(value: string): string[] {
-  const hints: string[] = [];
+interface AclAnthologyHint {
+  value: string;
+  /** DOI/URL 中自带的届次年份（如 2025.naacl-long.392 的 2025）。 */
+  year?: string;
+}
+
+function extractAclAnthologyHints(value: string): AclAnthologyHint[] {
+  const hints: AclAnthologyHint[] = [];
+  const seen = new Set<string>();
+  const push = (hint: AclAnthologyHint) => {
+    if (seen.has(hint.value)) return;
+    seen.add(hint.value);
+    hints.push(hint);
+  };
   const matches = [
     ...value.matchAll(
       /\b(?:10\.18653\/v1\/)?(20\d{2})\.([a-z]+(?:-[a-z]+)*)\.\d+\b/gi,
@@ -230,26 +263,39 @@ function extractAclAnthologyHints(value: string): string[] {
     const code = match[2].toLowerCase();
     const findings = code.match(/^findings-(acl|emnlp|naacl|eacl|coling)$/);
     if (findings?.[1]) {
-      hints.push(
-        `Findings of the Association for Computational Linguistics: ${findings[1].toUpperCase()} ${year}`,
-      );
+      push({
+        value: `Findings of the Association for Computational Linguistics: ${findings[1].toUpperCase()} ${year}`,
+        year,
+      });
       continue;
     }
 
     if (/^acl-(long|short|main)$/.test(code)) {
-      hints.push("ACL");
+      push({ value: "ACL", year });
     } else if (code === "emnlp-main") {
-      hints.push("EMNLP");
+      push({ value: "EMNLP", year });
     } else if (/^naacl-(long|short|main)$/.test(code)) {
-      hints.push("NAACL");
+      push({ value: "NAACL", year });
     } else if (code === "coling-main") {
-      hints.push("COLING");
+      push({ value: "COLING", year });
     } else if (/^eacl-(long|short|main)$/.test(code)) {
-      hints.push("EACL");
+      push({ value: "EACL", year });
     }
   }
 
-  return unique(hints);
+  return hints;
+}
+
+/**
+ * 从 DOI/URL/Extra 文本中提取 ACL Anthology 结构化年份。
+ * 这些年份来自 anthology 的收录届次（2025.naacl-long.392 → 2025），
+ * 比 proceedings 长名文本或条目 Date 更可靠。
+ */
+export function extractAclAnthologyYear(value: string): string | undefined {
+  for (const hint of extractAclAnthologyHints(value.toLowerCase())) {
+    if (hint.year) return hint.year;
+  }
+  return undefined;
 }
 
 function getVenueContext(item: Zotero.Item): string {
@@ -266,15 +312,23 @@ function getVenueContext(item: Zotero.Item): string {
     .join(" ");
 }
 
-function addIdentifierHints(candidates: VenueCandidate[], item: Zotero.Item) {
-  const identifierText = ["DOI", "url", "extra"]
-    .map((field) => getField(item, field))
-    .join(" ");
+function addIdentifierHints(
+  candidates: VenueCandidate[],
+  item: Zotero.Item,
+  identifierText: string,
+) {
   const normalizedIdentifierText = identifierText.toLowerCase();
   const venueContext = getVenueContext(item);
 
   for (const hint of extractAclAnthologyHints(normalizedIdentifierText)) {
-    addCandidate(candidates, hint, "identifier:acl-anthology", "conference");
+    addCandidate(
+      candidates,
+      hint.value,
+      "identifier:acl-anthology",
+      "conference",
+      undefined,
+      hint.year,
+    );
   }
 
   if (/cvpr\d{4}w\b|_cvprw_\d{4}_paper/.test(normalizedIdentifierText)) {
@@ -315,6 +369,15 @@ export function resolveItemMatch(item: Zotero.Item): MatchResult {
   // 手动标注年份（Extra venue 行）最权威，优先于命中候选自带的年份。
   const annotatedYear = extractAnnotatedVenueYear(getField(item, "extra"));
   if (annotatedYear) return { ...result, year: annotatedYear };
+  // ACL Anthology DOI/URL 的结构化年份（如 2025.naacl-long.392）：
+  // 无论哪个候选命中（proceedings 长名模糊命中时候选不携带年份），
+  // 该年份都成立；仅在产生 venue 判定（matched/none）时合并。
+  if (
+    resolution.anthologyYear &&
+    (result.status === "matched" || result.status === "none")
+  ) {
+    return { ...result, year: resolution.anthologyYear };
+  }
   return result;
 }
 
@@ -393,10 +456,19 @@ export function resolveVenueCandidates(item: Zotero.Item): VenueResolution {
     addCandidate(candidates, hint, "extra:comments");
   }
 
-  addIdentifierHints(candidates, item);
+  const identifierText = ["DOI", "url", "extra"]
+    .map((field) => getField(item, field))
+    .join(" ");
+  addIdentifierHints(candidates, item, identifierText);
+
+  // Extra 裸行兜底：排在所有结构化线索之后；matcher 端仅接受精确命中。
+  for (const line of extractBareExtraVenueLines(getField(item, "extra"))) {
+    addVenueField(candidates, line, "extra:bare");
+  }
 
   return {
     candidates,
     isPreprint: isPreprint(item),
+    anthologyYear: extractAclAnthologyYear(identifierText),
   };
 }

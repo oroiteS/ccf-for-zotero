@@ -190,3 +190,68 @@ describe("venue-annotated year channel", () => {
     assert.ok(report.includes("CCF Venue: AAAI 2027"));
   });
 });
+
+describe("ACL Anthology DOI year channel", () => {
+  it("carries the DOI year through a proceedings long-title match", () => {
+    // 真实场景：arXiv 条目带 ACL Anthology DOI，proceedings 长名模糊命中
+    // NAACL 但候选不携带年份；DOI 中的届次年份（2025）应作为条目级信号合并。
+    const item = makeItem(
+      {
+        DOI: "10.18653/v1/2025.naacl-long.392",
+        proceedingsTitle:
+          "Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers)",
+        extra: "arXiv:2503.22005 [cs.IR]",
+      },
+      "conferencePaper",
+      905,
+    );
+    const result = resolveItemMatch(item);
+
+    assert.equal(result.status, "matched");
+    assert.equal(result.abbr, "NAACL");
+    assert.equal(result.year, "2025");
+  });
+
+  it("carries the DOI year when the anthology identifier hint matches directly", () => {
+    const item = makeItem(
+      { DOI: "10.18653/v1/2025.naacl-long.392" },
+      "conferencePaper",
+      906,
+    );
+    const result = resolveItemMatch(item);
+
+    assert.equal(result.status, "matched");
+    assert.equal(result.abbr, "NAACL");
+    assert.equal(result.year, "2025");
+  });
+
+  it("keeps Findings DOIs as CCF None but still carries the year", () => {
+    // Findings 不在 CCF 目录，严格规则保留为 CCF None；但 DOI 年份
+    // 是条目级结构化信号，对 none 判定同样生效。
+    const item = makeItem(
+      { DOI: "10.18653/v1/2025.findings-emnlp.1171" },
+      "conferencePaper",
+      907,
+    );
+    const result = resolveItemMatch(item);
+
+    assert.equal(result.status, "none");
+    assert.equal(result.year, "2025");
+  });
+
+  it("lets the annotated venue year override the DOI year", () => {
+    const item = makeItem(
+      {
+        DOI: "10.18653/v1/2025.naacl-long.392",
+        extra: "CCF Venue: AAAI 2026",
+      },
+      "conferencePaper",
+      908,
+    );
+    const result = resolveItemMatch(item);
+
+    assert.equal(result.status, "matched");
+    assert.equal(result.abbr, "AAAI");
+    assert.equal(result.year, "2026");
+  });
+});

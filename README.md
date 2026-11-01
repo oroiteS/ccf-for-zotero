@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/github/license/oroiteS/ccf-for-zotero?style=flat-square" alt="License">
 </p>
 
-当前版本：`0.2.11`
+当前版本：`0.2.14`
 
 ## 界面预览
 
@@ -44,7 +44,7 @@
 
 ## 安装
 
-1. 前往 [Releases](https://github.com/oroiteS/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.11-zotero10.xpi`。
+1. 前往 [Releases](https://github.com/oroiteS/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.14-zotero10.xpi`。
 2. 打开 Zotero，进入 `工具` -> `插件`。
 3. 点击右上角齿轮，选择 `Install Add-on From File...`。
 4. 选择下载的 `.xpi` 文件，安装后重启 Zotero。
@@ -79,6 +79,36 @@
 - CAS：搜索 ISSN、期刊简称、全称、大类或小类。
 
 手动设置、忽略状态和自动识别结果分别保存，手动选择不会被后续自动刷新覆盖。
+
+## 手动补充会议/期刊信息（Extra 标注）
+
+离线目录没有收录、或者识别不准时，你可以把 venue 信息直接写进条目的 `Extra` 字段（条目详情右侧），识别器会读取它。推荐写法：
+
+```
+CCF Venue: AAAI 2027
+```
+
+规则：
+
+- **行前缀**支持 `CCF Venue` / `Venue` / `Conference` / `Journal` / `Booktitle` / `Proceedings` / `Publication`，也接受简写 `CCF: AAAI`。大小写不敏感，`:` 或 `=` 分隔。前缀拼写必须完整——写成 `CCF venud:` 这样的行会被整行忽略。
+- **行尾年份**（如 `NAACL 2025`）会作为届次年份显示。arXiv/preprint 条目的 Date 是提交日期，不代表录取届次；手动标注是唯一可控的年份来源。
+- 右键菜单里的手动设置也会自动把所选结果写成 `CCF Venue: <简称>` 行，与手写格式一致。
+- 允许的值必须是目录中的会议/期刊名；这一行不会把不在目录里的文本"猜"成 venue。
+
+### 裸行写法
+
+不带任何前缀、直接在 Extra 里写一行会议/期刊名也可以：
+
+```
+arXiv:2503.22005 [cs.IR]
+NAACL 2025
+```
+
+为避免把页数说明、链接、投稿备注等普通文本误识别成 venue，裸行只在**精确命中目录**（与简称/别名/全称完全一致）时生效：`AAAI`、`NAACL 2025` 会命中；`ICLR submission` 这类文本不会。含 `arXiv:`、`DOI:`、`Comments:`、URL、`ISSN` 等已知前缀的行不参与裸行识别。
+
+### 自动年份
+
+ACL Anthology DOI/URL（如 `10.18653/v1/2025.naacl-long.392`）自带届次年份，插件会自动识别会议与年份，无需手写。年份优先级：Extra 手动标注 > ACL Anthology DOI > 命中文本自带年份。
 
 ## 数据来源
 

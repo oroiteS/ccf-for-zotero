@@ -752,6 +752,16 @@ export function matchCandidates(
   for (const candidate of candidates) {
     const match = findVenue(candidate.value, candidate.kindHint);
     if (match) {
+      // Extra 裸行（无 key 文本）只接受精确类命中（置信度 ≥0.96：精确简称/
+      // 别名、紧凑别名、精确文本别名、精确全称）。开头简称（0.92）与受限
+      // 模糊（≤0.9）会把 "ICLR submission"、"Proceedings of a workshop on
+      // Vision and Language" 之类的非标注文本误判成 venue，必须拒绝。
+      if (
+        candidate.field.startsWith("extra:bare") &&
+        (match.confidence ?? 0) < 0.96
+      ) {
+        continue;
+      }
       if (!candidateSupportsAmbiguousBareAbbr(candidate, match)) {
         continue;
       }
@@ -850,6 +860,9 @@ function describeCandidateMatch(
   }
   if (candidate.field === "extra:comments") {
     return `Comments 接收声明 + ${matcherMethod || "本地匹配"}`;
+  }
+  if (candidate.field.startsWith("extra:bare")) {
+    return `Extra 裸行（仅精确命中） + ${matcherMethod || "本地匹配"}`;
   }
   if (candidate.field === "identifier:doi-prefix") {
     return `DOI 前缀线索 + ${matcherMethod || "本地匹配"}`;

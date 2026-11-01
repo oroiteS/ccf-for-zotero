@@ -71,6 +71,12 @@ export interface VenueCandidate {
 export interface VenueResolution {
   candidates: VenueCandidate[];
   isPreprint: boolean;
+  /**
+   * ACL Anthology DOI/URL 自带的届次年份（如 2025.naacl-long.392 的 2025）。
+   * 结构化标识符中的年份比命中候选文本更可靠：无论哪个候选命中，
+   * 都可以作为条目级年份合并（优先级低于 Extra 手动标注年份）。
+   */
+  anthologyYear?: string;
 }
 
 export interface MatchResult {

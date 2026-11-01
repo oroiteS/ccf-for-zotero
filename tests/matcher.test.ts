@@ -1171,7 +1171,8 @@ describe("local CCF matcher", () => {
 
       await refreshItemsRank([item]);
       const refreshed = unpackColumnData(registeredColumn.dataProvider(item));
-      assert.equal(refreshed.display, "CCF B | EMNLP");
+      // ACL Anthology DOI（2025.emnlp-main.1171）自带届次年份，随结果显示。
+      assert.equal(refreshed.display, "CCF B | EMNLP 2025");
     } finally {
       clearStorageMemoryCache();
       (globalThis as any).Zotero = originalZotero;
