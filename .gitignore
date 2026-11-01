@@ -9,3 +9,4 @@ docs/
 scripts/
 work/
 _private/
+.DS_Store
