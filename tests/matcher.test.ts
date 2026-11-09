@@ -50,7 +50,7 @@ function makeItem(
 describe("local CCF matcher", () => {
   it("loads the CCF catalog", () => {
     assert.equal(getVenueCount(), 750);
-    assert.match(getMatcherVersion(), /^0\.1\.18/);
+    assert.match(getMatcherVersion(), /^0\.1\.19/);
   });
 
   const cases: Array<[string, string, string]> = [
@@ -653,6 +653,34 @@ describe("local CCF matcher", () => {
       false,
     );
     assert.equal(result.status, "none");
+  });
+
+  it("does not mistake journal-name prefixes for journal abbreviations", () => {
+    for (const value of ["AI Open", "AI Review"]) {
+      assert.equal(findVenue(value, "journal"), undefined, value);
+      assert.equal(findVenue(value), undefined, value);
+    }
+
+    const item = makeItem(
+      {
+        title: "A survey on generative recommendation: Data, model, and tasks",
+        publicationTitle: "AI Open",
+        journalAbbreviation: "AI Open",
+        date: "2026-01-01",
+        DOI: "10.1016/j.aiopen.2026.05.002",
+        url: "https://www.sciencedirect.com/science/article/pii/S2666651026000100",
+      },
+      "journalArticle",
+    );
+    const resolved = resolveVenueCandidates(item);
+    const result = matchCandidates(resolved.candidates, resolved.isPreprint);
+    assert.equal(result.status, "none");
+    assert.equal(result.abbr, undefined);
+    assert.equal(result.venueText, "AI Open");
+
+    assert.equal(findVenue("AI", "journal")?.fullName, "Artificial Intelligence");
+    assert.equal(findVenue("Artificial Intelligence", "journal")?.rank, "A");
+    assert.equal(findVenue("ICLR 2026 Oral", "conference")?.abbr, "ICLR");
   });
 
   it("does not match bare AI as the Artificial Intelligence journal outside journal context", () => {

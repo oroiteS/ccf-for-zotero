@@ -24,7 +24,7 @@ const data: CCFDataFile = {
   source: `${internationalData.source}; ${chineseJournalData.source}`,
   venues: [...internationalData.venues, ...chineseJournalData.venues],
 };
-const MATCHER_VERSION = "0.1.18-arxiv-comments-venue-hints";
+const MATCHER_VERSION = "0.1.19-strict-journal-prefix";
 
 const genericTokens = new Set([
   "acm",
@@ -715,8 +715,12 @@ function findVenueFromQuery(
   const leadingToken = stripped.match(/^([A-Za-z][A-Za-z0-9+/-]{1,})\b/);
   if (leadingToken) {
     const token = normalizeAbbr(leadingToken[1]);
+    // 期刊名开头的简称可能只是另一期刊名称的一部分（如 AI Open）；
+    // 期刊只允许通过精确别名、全称或后续受限模糊规则识别。
     const leadingAlias = pickBest(
-      index.aliasMap.get(token) || [],
+      (index.aliasMap.get(token) || []).filter(
+        (entry) => entry.venue.kind !== "journal",
+      ),
       stripped,
       kindHint,
     );
