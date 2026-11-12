@@ -1154,11 +1154,12 @@ describe("local CCF matcher", () => {
 
   it("keeps CCF column reads cheap and uses the cache after refresh", async () => {
     let registeredColumn: any;
+    let displayStyle = "classic";
     const originalZotero = (globalThis as any).Zotero;
     (globalThis as any).Zotero = {
       Prefs: {
-        get() {
-          return "";
+        get(key: string) {
+          return key.endsWith(".ccfDisplayStyle") ? displayStyle : "";
         },
         set() {},
       },
@@ -1201,6 +1202,10 @@ describe("local CCF matcher", () => {
       const refreshed = unpackColumnData(registeredColumn.dataProvider(item));
       // ACL Anthology DOI（2025.emnlp-main.1171）自带届次年份，随结果显示。
       assert.equal(refreshed.display, "CCF B | EMNLP 2025");
+      displayStyle = "compact";
+      assert.equal(unpackColumnData(registeredColumn.dataProvider(item)).display, "B|EMNLP 2025");
+      displayStyle = "classic";
+      assert.equal(unpackColumnData(registeredColumn.dataProvider(item)).display, "CCF B | EMNLP 2025");
     } finally {
       clearStorageMemoryCache();
       (globalThis as any).Zotero = originalZotero;

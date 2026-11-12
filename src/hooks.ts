@@ -8,6 +8,7 @@ import {
 import { shutdownInitialization } from "./modules/initialization";
 import { invalidateCASItemStates } from "./modules/casStorage";
 import { registerRightClickMenu, registerToolsMenu } from "./modules/menu";
+import { clearRecognitionProjectObservers } from "./modules/projectPreferences";
 import { invalidateItemStates } from "./modules/storage";
 import { registerItemNotifier, unregisterItemNotifier } from "./modules/notifier";
 import {
@@ -57,6 +58,7 @@ function onShutdown(): void {
   shutdownBackgroundWarmup();
   shutdownInvalidationRecompute();
   unregisterPreferencesPane();
+  clearRecognitionProjectObservers();
   ztoolkit.unregisterAll();
   addon.data.alive = false;
   // @ts-expect-error The add-on instance name is configured at build time.

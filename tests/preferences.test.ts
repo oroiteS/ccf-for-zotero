@@ -42,6 +42,14 @@ describe("CCF/CAS initialization preference pane", () => {
     assert.match(markup, /html:select/);
   });
 
+  it("presents both display styles as an accessible radio group", () => {
+    const markup = readFileSync(resolve(projectRoot, "addon/content/preferences.xhtml"), "utf8");
+    assert.match(markup, /role="radiogroup" aria-labelledby="ccf-display-style-label"/);
+    assert.match(markup, /id="ccf-display-classic"[^>]*type="radio"[^>]*name="ccf-display-style"[^>]*value="classic"/);
+    assert.match(markup, /id="ccf-display-compact"[^>]*type="radio"[^>]*name="ccf-display-style"[^>]*value="compact"/);
+    assert.doesNotMatch(markup, /<html:select id="ccf-display-style"/);
+  });
+
   it("uses the Zotero-generated pane heading without duplicating it in the document", () => {
     const markup = readFileSync(
       resolve(projectRoot, "addon/content/preferences.xhtml"),

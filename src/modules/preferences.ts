@@ -1,5 +1,7 @@
 import { config } from "../../package.json";
 import { cancelBackgroundWarmup } from "./backgroundWarmup";
+import { getCCFDisplayStyle, setCCFDisplayStyle } from "./displayPreferences";
+import { getRecognitionProjects, setRecognitionProjects } from "./projectPreferences";
 import {
   cancelInitialization,
   getInitializationProgress,
@@ -187,6 +189,7 @@ export function normalizeInitializationScope(
 }
 
 function setElementDisabled(element: ValueControl, disabled: boolean) {
+  if (element.disabled === disabled) return;
   element.disabled = disabled;
   if (disabled) element.setAttribute("disabled", "disabled");
   else element.removeAttribute("disabled");
@@ -211,7 +214,8 @@ function syncSelectedItemsScope(
     log("Could not update selected-items initialization scope", error);
   }
 
-  option.textContent = getInitializationScopeLabel(selectedCount);
+  const label = getInitializationScopeLabel(selectedCount);
+  if (option.textContent !== label) option.textContent = label;
   setElementDisabled(option, selectedCount === 0);
   const normalizedScope = normalizeInitializationScope(
     String(scope.value || "current-collection") as InitializationScope,
@@ -257,12 +261,6 @@ function applyLastConfiguration(
     if (state.lastMode && isMode(state.lastMode)) {
       const mode = getControl(root, "ccf-init-mode");
       if (mode) mode.value = state.lastMode;
-    }
-    if (state.lastProjects?.length) {
-      const ccf = getControl(root, "ccf-init-ccf");
-      const cas = getControl(root, "ccf-init-cas");
-      if (ccf) ccf.checked = state.lastProjects.includes("CCF");
-      if (cas) cas.checked = state.lastProjects.includes("CAS");
     }
   } catch (error) {
     log("Could not restore CCF/CAS initialization settings", error);
@@ -412,6 +410,10 @@ export function attachInitializationPreferences(
     getControl(root, "ccf-init-start")?.removeEventListener("click", start);
     getControl(root, "ccf-init-cancel")?.removeEventListener("command", cancel);
     getControl(root, "ccf-init-cancel")?.removeEventListener("click", cancel);
+    getControl(root, "ccf-display-classic")?.removeEventListener("change", changeDisplayStyle);
+    getControl(root, "ccf-display-compact")?.removeEventListener("change", changeDisplayStyle);
+    getControl(root, "ccf-init-ccf")?.removeEventListener("change", changeProjects);
+    getControl(root, "ccf-init-cas")?.removeEventListener("change", changeProjects);
     prefWindow.removeEventListener("unload", cleanup);
     if (cleanupByWindow.get(prefWindow) === cleanup) cleanupByWindow.delete(prefWindow);
   };
@@ -451,6 +453,58 @@ export function attachInitializationPreferences(
     api.cancelInitialization();
     sync();
   };
+
+  const syncDisplayStyle = () => {
+    const style = getCCFDisplayStyle();
+    const classic = getControl(root, "ccf-display-classic");
+    const compact = getControl(root, "ccf-display-compact");
+    if (classic) classic.checked = style === "classic";
+    if (compact) compact.checked = style === "compact";
+  };
+
+  const changeDisplayStyle = (event: Event) => {
+    if (cleaned) return;
+    const control = event.currentTarget as ValueControl | null;
+    const style = control?.value;
+    if (!control?.checked || (style !== "compact" && style !== "classic")) return;
+    try {
+      setCCFDisplayStyle(style);
+      setText(root, "ccf-display-validation", "");
+    } catch (error) {
+      syncDisplayStyle();
+      setText(root, "ccf-display-validation", "保存显示设置失败，请查看 Zotero 错误日志。");
+      log("Could not save CCF display style", error);
+    }
+  };
+
+  const syncProjects = () => {
+    const projects = getRecognitionProjects();
+    const ccf = getControl(root, "ccf-init-ccf");
+    const cas = getControl(root, "ccf-init-cas");
+    if (ccf) ccf.checked = projects.includeCCF;
+    if (cas) cas.checked = projects.includeCAS;
+  };
+  const changeProjects = () => {
+    if (cleaned) return;
+    try {
+      setRecognitionProjects({
+        includeCCF: getChecked(root, "ccf-init-ccf"),
+        includeCAS: getChecked(root, "ccf-init-cas"),
+      });
+      setText(root, "ccf-projects-validation", "");
+    } catch (error) {
+      syncProjects();
+      setText(root, "ccf-projects-validation", "保存识别项目失败，请查看 Zotero 错误日志。");
+      log("Could not save CCF/CAS recognition projects", error);
+    }
+  };
+
+  syncProjects();
+  getControl(root, "ccf-init-ccf")?.addEventListener("change", changeProjects);
+  getControl(root, "ccf-init-cas")?.addEventListener("change", changeProjects);
+  syncDisplayStyle();
+  getControl(root, "ccf-display-classic")?.addEventListener("change", changeDisplayStyle);
+  getControl(root, "ccf-display-compact")?.addEventListener("change", changeDisplayStyle);
 
   cleanupByWindow.set(prefWindow, cleanup);
   if (!api) {

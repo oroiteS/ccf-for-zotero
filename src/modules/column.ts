@@ -1,4 +1,5 @@
 import { config } from "../../package.json";
+import { CCFDisplayStyle, getCCFDisplayStyle } from "./displayPreferences";
 import { formatNonCcfVenueText } from "./nonCcfAliases";
 import { getColumnDisplayState } from "./rankService";
 import { ItemRankState } from "./types";
@@ -89,6 +90,7 @@ function buildTooltip(state: ItemRankState, display: string): string {
 export interface FormatColumnOptions {
   /** 条目 Date 字段年份，仅作兜底；venue 标注年份（state.matchYear）优先。 */
   year?: string | number;
+  style?: CCFDisplayStyle;
 }
 
 /**
@@ -129,12 +131,13 @@ export function formatColumnDataForState(
 ): string {
   // 年份依据优先级：venue 标注年份（extra/proceedings 自带，语义可靠）
   // 优先于条目 Date 字段（会议条目的 Date 可能是提交日/剪藏日，语义不可靠）。
-  // preprint 条目的 Date 是提交日，与录取届次必然无关，直接不参与兜底——
-  // 此时唯一可信来源是手动标注（如 "CCF Venue: AAAI 2027"），没有就不显示。
+  // 已匹配 venue 的 preprint 条目不能把提交日当作录取届次；
+  // 仅显示 arXiv 时，Date 年份可用于表示预印本提交年份。
   const dateYear = normalizeYear(options.year);
   const year =
     normalizeYear(state.matchYear) ||
-    (state.preprintSignal ? undefined : dateYear);
+    (state.preprintSignal && state.status !== "preprint" ? undefined : dateYear);
+  const compact = (options.style ?? "classic") === "compact";
   let display = "";
   let title = "";
 
@@ -142,57 +145,61 @@ export function formatColumnDataForState(
     return packColumnData(getSortKey(state, display), display, title);
   }
   if (state.status === "preprint") {
-    display = "Preprint | arXiv";
+    display = compact ? "arXiv" : "Preprint | arXiv";
   } else if (state.status === "unknown") {
     display = "Unknown";
   } else if (state.status === "none") {
     const originalVenue = state.venueText || "Venue";
     const displayVenue = formatNonCcfVenueText(originalVenue);
-    display = `CCF None | ${displayVenue}`;
+    const prefix = compact ? "None|" : "CCF None | ";
+    display = `${prefix}${displayVenue}`;
     title = buildTooltip(
       state,
-      appendYearSuffix(`CCF None | ${originalVenue}`, year),
+      appendYearSuffix(`${prefix}${originalVenue}`, year),
     );
   } else if (state.rank) {
     // 目录中不少期刊（如 Neural Networks、Neural Computation）没有官方简称，
     // abbr 为空不代表识别失败；依次回退全称/来源文本，避免把已命中的条目
     // 误显示为 Unknown（识别诊断与列渲染必须保持一致）。
     const venueName = state.abbr || state.fullName || state.venueText || "";
-    display = venueName ? `CCF ${state.rank} | ${venueName}` : `CCF ${state.rank}`;
+    const rankLabel = compact ? state.rank : `CCF ${state.rank}`;
+    display = venueName ? `${rankLabel}${compact ? "|" : " | "}${venueName}` : rankLabel;
   } else {
     display = "Unknown";
   }
 
   // 排序键继续使用不带年份的 display，保证追加年份不改变既有排序行为；
-  // 徽章展示文本追加年份（如 "CCF A | AAAI 2026"）。
+  // 徽章展示文本追加年份（如 "A|AAAI 2026"）。
   const displayWithYear = appendYearSuffix(display, year);
   if (!title) title = buildTooltip(state, displayWithYear);
   return packColumnData(getSortKey(state, display), displayWithYear, title);
 }
 
 function getBadgeColors(text: string) {
-  if (text.startsWith("CCF A |")) {
+  text = text.replace(/^CCF (A|B|C|T1|T2|T3|None) \| /, "$1|");
+  if (text.startsWith("Preprint | ")) text = text.slice("Preprint | ".length);
+  if (text.startsWith("A|")) {
     return { background: "#dff3e8", color: "#146c43", border: "#b7dfc8" };
   }
-  if (text.startsWith("CCF B |")) {
+  if (text.startsWith("B|")) {
     return { background: "#e8eefc", color: "#2f56a6", border: "#c8d5f6" };
   }
-  if (text.startsWith("CCF C |")) {
+  if (text.startsWith("C|")) {
     return { background: "#fff2cc", color: "#8a5a00", border: "#ead083" };
   }
-  if (text.startsWith("CCF T1 |")) {
+  if (text.startsWith("T1|")) {
     return { background: "#dcfce7", color: "#166534", border: "#bbf7d0" };
   }
-  if (text.startsWith("CCF T2 |")) {
+  if (text.startsWith("T2|")) {
     return { background: "#e0f2fe", color: "#075985", border: "#bae6fd" };
   }
-  if (text.startsWith("CCF T3 |")) {
+  if (text.startsWith("T3|")) {
     return { background: "#fef3c7", color: "#92400e", border: "#fde68a" };
   }
-  if (text.startsWith("Preprint |")) {
+  if (text === "arXiv" || text.startsWith("arXiv ")) {
     return { background: "#edf0f4", color: "#52616b", border: "#d4dae2" };
   }
-  if (text.startsWith("CCF None |")) {
+  if (text.startsWith("None|")) {
     return { background: "#f1e5f6", color: "#7a2c8f", border: "#e0c8e8" };
   }
   return { background: "#f4e8e8", color: "#9b2c2c", border: "#e8c9c9" };
@@ -210,6 +217,7 @@ export async function registerCCFColumn() {
       try {
         return formatColumnDataForState(getColumnDisplayState(item), {
           year: getItemPublicationYear(item),
+          style: getCCFDisplayStyle(),
         });
       } catch (error) {
         ztoolkit.log("CCF column dataProvider failed", error);

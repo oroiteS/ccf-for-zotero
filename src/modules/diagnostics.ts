@@ -1,6 +1,7 @@
 import { matchCandidates } from "./matcher";
 import { formatNonCcfVenueText } from "./nonCcfAliases";
 import { getItemPublicationYear } from "./column";
+import { getCCFDisplayStyle } from "./displayPreferences";
 import { MatchResult, VenueCandidate } from "./types";
 import { resolveItemMatch, resolveVenueCandidates } from "./venueResolver";
 
@@ -58,10 +59,11 @@ function appendYearSuffix(text: string, year?: string): string {
 }
 
 function formatResult(result: MatchResult, year?: string): string {
+  const compact = getCCFDisplayStyle() === "compact";
   if (result.status === "matched") {
     return [
       `结果：${appendYearSuffix(
-        `CCF ${result.rank} | ${result.abbr || result.fullName || result.venueText || "n/a"}`,
+        `${compact ? result.rank : `CCF ${result.rank}`}${compact ? "|" : " | "}${result.abbr || result.fullName || result.venueText || "n/a"}`,
         year,
       )}`,
       `全称：${result.fullName || "n/a"}`,
@@ -76,7 +78,7 @@ function formatResult(result: MatchResult, year?: string): string {
     const venueText = result.venueText || "n/a";
     return [
       `结果：${appendYearSuffix(
-        `CCF None | ${formatNonCcfVenueText(venueText)}`,
+        `${compact ? "None|" : "CCF None | "}${formatNonCcfVenueText(venueText)}`,
         year,
       )}`,
       `来源文本：${venueText}`,
@@ -87,7 +89,7 @@ function formatResult(result: MatchResult, year?: string): string {
 
   if (result.status === "preprint") {
     return [
-      "结果：Preprint | arXiv",
+      `结果：${appendYearSuffix(compact ? "arXiv" : "Preprint | arXiv", year)}`,
       `来源文本：${result.venueText || "arXiv"}`,
       ...formatEvidence(result),
       `置信度：${formatConfidence(result)}`,
@@ -128,10 +130,10 @@ export function getItemDiagnostics(item: Zotero.Item): ItemDiagnostics {
   // 与列缓存重算走同一入口（resolveItemMatch），保证诊断与列表显示一致。
   const result = resolveItemMatch(item);
   const resolution = resolveVenueCandidates(item);
-  // 与列显示保持同一优先级：venue 标注年份优先；preprint 条目的 Date 是
-  // 提交日，与录取届次无关，不参与兜底。
+  // 与列显示保持同一优先级：venue 标注年份优先；已匹配 venue 的
+  // preprint 不把提交日当作届次，单独显示 arXiv 时则可使用提交年份。
   const dateYear = getItemPublicationYear(item);
-  const dateUsable = !result.preprintSignal;
+  const dateUsable = result.status === "preprint" || !result.preprintSignal;
   const year = result.year || (dateUsable ? dateYear : undefined);
   return {
     itemType: item.itemType,

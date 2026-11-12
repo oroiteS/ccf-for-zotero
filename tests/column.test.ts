@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   formatColumnDataForState,
+  registerCCFColumn,
   unpackColumnData,
 } from "../src/modules/column";
 import { ItemRankState } from "../src/modules/types";
@@ -136,6 +137,57 @@ describe("CCF column display formatting", () => {
     const { display } = unpackColumnData(packed);
 
     assert.equal(display, "CCF B | AAAI 2026");
+  });
+
+  it("shows standalone arXiv with its submission year, when available", () => {
+    const state = buildState({ status: "preprint", rank: undefined, preprintSignal: true });
+    const withYear = unpackColumnData(formatColumnDataForState(state, { year: 2027, style: "compact" }));
+    const withoutYear = unpackColumnData(formatColumnDataForState(state, { style: "compact" }));
+    assert.equal(withYear.display, "arXiv 2027");
+    assert.equal(withoutYear.display, "arXiv");
+    assert.equal(withYear.sortKey, withoutYear.sortKey);
+    assert.ok(withYear.title.startsWith("arXiv 2027"));
+  });
+
+  it("formats matched and non-CCF venues in both selectable styles", () => {
+    const matched = buildState({ rank: "A", abbr: "AAAI" });
+    const none = buildState({ status: "none", rank: undefined, venueText: "Local Venue" });
+    assert.equal(unpackColumnData(formatColumnDataForState(matched, { year: 2027 })).display, "CCF A | AAAI 2027");
+    assert.equal(unpackColumnData(formatColumnDataForState(matched, { year: 2027, style: "compact" })).display, "A|AAAI 2027");
+    assert.equal(unpackColumnData(formatColumnDataForState(none)).display, "CCF None | Local Venue");
+    assert.equal(unpackColumnData(formatColumnDataForState(none, { style: "compact" })).display, "None|Local Venue");
+  });
+
+  it("retains colors for abbreviated ranks, non-CCF venues and arXiv", async () => {
+    const previous = (globalThis as any).Zotero;
+    let column: any;
+    (globalThis as any).Zotero = {
+      ItemTreeManager: { async registerColumns(value: any) { column = value; } },
+    };
+    try {
+      await registerCCFColumn();
+      const doc = {
+        createElement() {
+          return { style: {}, appendChild(child: any) { (this as any).child = child; } };
+        },
+      };
+      for (const [display, color] of [
+        ["CCF A | AAAI 2027", "#dff3e8"], ["CCF B | EMNLP", "#e8eefc"],
+        ["CCF C | Venue", "#fff2cc"], ["CCF T1 | Venue", "#dcfce7"],
+        ["CCF T2 | Venue", "#e0f2fe"], ["CCF T3 | Venue", "#fef3c7"],
+        ["CCF None | Venue", "#f1e5f6"], ["Preprint | arXiv 2027", "#edf0f4"],
+        ["A|AAAI 2027", "#dff3e8"], ["B|EMNLP", "#e8eefc"],
+        ["C|Venue", "#fff2cc"], ["T1|Venue", "#dcfce7"],
+        ["T2|Venue", "#e0f2fe"], ["T3|Venue", "#fef3c7"],
+        ["None|Venue", "#f1e5f6"], ["arXiv 2027", "#edf0f4"],
+        ["Unknown", "#f4e8e8"],
+      ]) {
+        const cell = column.renderCell(0, display, { className: "test" }, false, doc);
+        assert.equal(cell.child.style.backgroundColor, color, display);
+      }
+    } finally {
+      (globalThis as any).Zotero = previous;
+    }
   });
 
   it("ignores invalid year values", () => {

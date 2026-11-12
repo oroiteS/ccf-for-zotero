@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/github/license/oroiteS/ccf-for-zotero?style=flat-square" alt="License">
 </p>
 
-当前版本：`0.2.15`
+当前版本：`0.2.16`
 
 ## 界面预览
 
@@ -44,7 +44,7 @@
 
 ## 安装
 
-1. 前往 [Releases](https://github.com/oroiteS/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.15-zotero10.xpi`。
+1. 前往 [Releases](https://github.com/oroiteS/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.16-zotero10.xpi`。
 2. 打开 Zotero，进入 `工具` -> `插件`。
 3. 点击右上角齿轮，选择 `Install Add-on From File...`。
 4. 选择下载的 `.xpi` 文件，安装后重启 Zotero。
@@ -57,13 +57,20 @@
 
 初始化支持当前集合、我的文库全部文献和当前选中条目。默认采用增量识别，已经有有效缓存的条目会跳过；任务带进度和取消操作，已完成的批次会保留。插件不会因为打开主库就自动刷新全部文献。
 
+「识别项目」的勾选会保存，并同时控制初始化项目及插件的右键、工具菜单：取消勾选后对应菜单隐藏，重新勾选即可恢复。这个设置不删除数据，也不关闭后台识别或文献列表中的对应列。
+
+在同一设置页的「显示设置」中可切换 CCF 列的经典或简洁格式：默认经典格式（如 `CCF A | AAAI 2027`），简洁格式如 `A|AAAI 2027`、`arXiv 2027`。此设置不影响 CAS 列或识别结果。
+
 ## 识别结果
+
+以下 CCF 示例为简洁格式；经典格式保留 `CCF` 和 `Preprint` 前缀。
 
 | 显示 | 含义 |
 | --- | --- |
-| `CCF A/B/C` | 命中 CCF 国际推荐目录 |
-| `CCF T1/T2/T3` | 命中 CCF 计算领域高质量科技期刊目录 |
-| `CCF None` | 已识别出出版物，但不在当前 CCF 目录中 |
+| `A\|AAAI 2027`（A/B/C） | 命中 CCF 国际推荐目录，显示等级、来源和年份 |
+| `T1\|期刊名`（T1/T2/T3） | 命中 CCF 计算领域高质量科技期刊目录 |
+| `None\|来源` | 已识别出出版物，但不在当前 CCF 目录中 |
+| `arXiv 2027` | 只有预印本线索时，显示 arXiv 和可用的条目日期年份 |
 | `CAS 1区/2区/3区/4区` | 命中内置 CAS 期刊分区快照 |
 | `CAS None` | 已识别为期刊，但当前快照中没有对应记录 |
 | `N/A` | 条目不是期刊，CAS 不适用 |

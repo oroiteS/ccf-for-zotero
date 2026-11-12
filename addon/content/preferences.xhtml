@@ -8,6 +8,22 @@
   </html:p>
 
   <html:fieldset class="ccf-section">
+    <html:legend>显示设置</html:legend>
+    <html:div role="radiogroup" aria-labelledby="ccf-display-style-label">
+      <html:div id="ccf-display-style-label" class="ccf-display-label">CCF 列显示格式</html:div>
+      <html:label class="ccf-check-row" for="ccf-display-classic">
+        <html:input id="ccf-display-classic" class="ccf-check" type="radio" name="ccf-display-style" value="classic" checked="checked" />
+        <html:span>经典：CCF A | AAAI 2027 / Preprint | arXiv 2027</html:span>
+      </html:label>
+      <html:label class="ccf-check-row" for="ccf-display-compact">
+        <html:input id="ccf-display-compact" class="ccf-check" type="radio" name="ccf-display-style" value="compact" />
+        <html:span>简洁：A|AAAI 2027 / arXiv 2027</html:span>
+      </html:label>
+      <html:p id="ccf-display-validation" class="ccf-display-validation" role="status" aria-live="polite"></html:p>
+    </html:div>
+  </html:fieldset>
+
+  <html:fieldset class="ccf-section">
     <html:legend>处理范围</html:legend>
     <html:label class="ccf-field" for="ccf-init-scope">
       <html:span class="ccf-field-label">选择需要处理的文献范围</html:span>
@@ -29,6 +45,8 @@
       <html:input id="ccf-init-cas" class="ccf-check" type="checkbox" checked="checked" />
       <html:span>CAS 中科院分区</html:span>
     </html:label>
+    <html:p class="ccf-projects-hint">控制初始化项目和菜单显示；不删除已有数据，也不关闭后台识别或文献列表列。</html:p>
+    <html:p id="ccf-projects-validation" class="ccf-display-validation" role="status" aria-live="polite"></html:p>
   </html:fieldset>
 
   <html:fieldset class="ccf-section">

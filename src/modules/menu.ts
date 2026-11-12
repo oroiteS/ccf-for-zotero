@@ -14,6 +14,7 @@ import {
   isInitializationRunning,
 } from "./initialization";
 import { openPreferencesPane } from "./preferences";
+import { getRecognitionProjects, observeRecognitionProjects, RecognitionProjects } from "./projectPreferences";
 import {
   ensureCASCatalog,
   getCASCatalogVersion,
@@ -1243,10 +1244,36 @@ function appendPluginMenuSections(
   doc: Document,
   win: _ZoteroTypes.MainWindow,
   popup: Element,
+  projects: RecognitionProjects,
 ) {
   appendTaskMenuSection(doc, win, popup);
-  appendCCFMenuSection(doc, win, popup);
-  appendCASRankingMenuSection(doc, win, popup);
+  if (projects.includeCCF) appendCCFMenuSection(doc, win, popup);
+  if (projects.includeCAS) appendCASRankingMenuSection(doc, win, popup);
+}
+
+/** 在菜单打开前按设置创建原生菜单；不依赖 macOS 子菜单的 hidden 更新。 */
+function mountPluginMenu(
+  win: _ZoteroTypes.MainWindow,
+  parent: Element,
+  id: string,
+) {
+  const doc = win.document;
+  let root: Element | undefined;
+  const render = (projects: RecognitionProjects) => {
+    const next = doc.createXULElement("menu");
+    next.setAttribute("id", id);
+    next.setAttribute("label", text.root);
+    applyPluginMenuIcon(next);
+    const popup = doc.createXULElement("menupopup");
+    next.appendChild(popup);
+    appendPluginMenuSections(doc, win, popup, projects);
+    if (root && root.parentNode === parent) parent.replaceChild(next, root);
+    else parent.appendChild(next);
+    root = next;
+  };
+  render(getRecognitionProjects());
+  const unobserve = observeRecognitionProjects(render);
+  win.addEventListener("unload", unobserve, { once: true });
 }
 
 export function registerRightClickMenu(win: _ZoteroTypes.MainWindow) {
@@ -1254,16 +1281,7 @@ export function registerRightClickMenu(win: _ZoteroTypes.MainWindow) {
   const menu = doc.getElementById("zotero-itemmenu");
   if (!menu || doc.getElementById("ccf-for-zotero-menu")) return;
 
-  const root = doc.createXULElement("menu");
-  root.setAttribute("id", "ccf-for-zotero-menu");
-  root.setAttribute("label", text.root);
-  applyPluginMenuIcon(root);
-
-  const popup = doc.createXULElement("menupopup");
-  root.appendChild(popup);
-  appendPluginMenuSections(doc, win, popup);
-
-  menu.appendChild(root);
+  mountPluginMenu(win, menu, "ccf-for-zotero-menu");
 }
 
 export function registerToolsMenu(win: _ZoteroTypes.MainWindow) {
@@ -1278,14 +1296,5 @@ export function registerToolsMenu(win: _ZoteroTypes.MainWindow) {
     return;
   }
 
-  const root = doc.createXULElement("menu");
-  root.setAttribute("id", "ccf-for-zotero-tools-menu");
-  root.setAttribute("label", text.root);
-  applyPluginMenuIcon(root);
-
-  const popup = doc.createXULElement("menupopup");
-  root.appendChild(popup);
-  appendPluginMenuSections(doc, win, popup);
-
-  toolsPopup.appendChild(root);
+  mountPluginMenu(win, toolsPopup, "ccf-for-zotero-tools-menu");
 }

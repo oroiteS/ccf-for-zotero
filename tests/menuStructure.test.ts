@@ -26,14 +26,14 @@ describe("CCF/CAS menu organization", () => {
     assert.match(source, /taskGroup: "初始化与后台任务"/);
     assert.match(source, /ccfGroup: "CCF 分级"/);
     assert.match(source, /casGroup: "CAS 中科院分区"/);
-    assert.match(rightClickMenu, /appendPluginMenuSections\(doc, win, popup\)/);
+    assert.match(rightClickMenu, /mountPluginMenu\(win, menu, "ccf-for-zotero-menu"\)/);
   });
 
   it("groups the top Tools menu with the same task, CCF, and CAS submenus", () => {
     const source = menuSource();
     const toolsMenu = functionBody(source, "registerToolsMenu");
 
-    assert.match(toolsMenu, /appendPluginMenuSections\(doc, win, popup\)/);
+    assert.match(toolsMenu, /mountPluginMenu\(win, toolsPopup, "ccf-for-zotero-tools-menu"\)/);
     assert.doesNotMatch(toolsMenu, /setAttribute\("label", text\.refresh\)/);
     assert.doesNotMatch(toolsMenu, /setAttribute\("label", casText\.refresh\)/);
   });

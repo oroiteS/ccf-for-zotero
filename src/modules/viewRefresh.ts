@@ -205,6 +205,27 @@ function invalidateActiveItemTree(): boolean {
   }
 }
 
+/** 显示设置是全局的，清除所有已打开主窗口的行缓存并重绘。 */
+export function refreshAllItemTrees(): void {
+  try {
+    const views = new Set<any>();
+    for (const win of Zotero.getMainWindows?.() || []) {
+      const view = (win as any).ZoteroPane?.itemsView;
+      if (view) views.add(view);
+    }
+    const activeView = Zotero.getActiveZoteroPane?.()?.itemsView;
+    if (activeView) views.add(activeView);
+    for (const view of views) {
+      clearItemTreeRowCache(view, true);
+      if (!callViewMethod(view.tree || view._tree, "invalidate")) {
+        callViewMethod(view, "invalidate");
+      }
+    }
+  } catch (error) {
+    ztoolkit.log("Could not refresh all Zotero item views", error);
+  }
+}
+
 export function softRefreshItemsView(targets: RefreshTarget[] = []): boolean {
   if (invalidateItemRows(targets)) return true;
 

@@ -46,6 +46,25 @@
   border-radius: 3px;
 }
 
+#ccf-init-root .ccf-display-label {
+  margin-bottom: 4px;
+}
+
+#ccf-init-root .ccf-projects-hint {
+  margin: 4px 0 0;
+  color: GrayText;
+  line-height: 1.4;
+}
+
+#ccf-init-root .ccf-display-validation {
+  margin: 2px 0 0;
+  color: #a33a20;
+}
+
+#ccf-init-root .ccf-display-validation:empty {
+  display: none;
+}
+
 #ccf-init-root .ccf-check-row {
   display: flex;
   align-items: center;

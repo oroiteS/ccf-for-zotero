@@ -120,6 +120,24 @@ describe("venue-annotated year channel", () => {
     assert.equal(result.year, "2026");
   });
 
+  it("shows a standalone preprint's submission year in the column and diagnostics", () => {
+    const item = makeItem(
+      { archiveID: "arXiv:2701.12345", date: "2027-01-10" },
+      "preprint",
+      910,
+    );
+    const result = resolveItemMatch(item);
+    assert.equal(result.status, "preprint");
+    const state: ItemRankState = {
+      itemKey: "1:910", status: result.status, source: "auto",
+      updatedAt: "2027-01-10T00:00:00.000Z",
+    };
+    assert.equal(unpackColumnData(formatColumnDataForState(state, { year: "2027" })).display, "Preprint | arXiv 2027");
+    const report = formatItemDiagnostics(item);
+    assert.ok(report.includes("结果：Preprint | arXiv 2027"));
+    assert.ok(report.includes("显示年份：2027（来源：条目 Date 字段）"));
+  });
+
   it("never falls back to the arXiv submission year for accepted preprints", () => {
     // 场景：2026 年上传的 arXiv 论文中了 AAAI-2027。条目 Date 是提交日，
     // 与录取届次必然无关，因此 date 年份不参与兜底。
