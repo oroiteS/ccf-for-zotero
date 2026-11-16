@@ -1,7 +1,7 @@
 {
   "name": "ccf-for-zotero",
   "type": "module",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "packageManager": "pnpm@12.21.0",
   "description": "Offline CCF and CAS ranking badges for Zotero.",
   "config": {
