@@ -24,6 +24,23 @@
   </html:fieldset>
 
   <html:fieldset class="ccf-section">
+    <html:legend>CCF 排序模式</html:legend>
+    <html:div role="radiogroup" aria-labelledby="ccf-sort-mode-label" aria-describedby="ccf-sort-hint">
+      <html:div id="ccf-sort-mode-label" class="ccf-display-label">选择 CCF 列排序模式</html:div>
+      <html:label class="ccf-check-row" for="ccf-sort-rank">
+        <html:input id="ccf-sort-rank" class="ccf-check" type="radio" name="ccf-sort-mode" value="rank" checked="checked" />
+        <html:span>等级优先（原有排序）</html:span>
+      </html:label>
+      <html:label class="ccf-check-row" for="ccf-sort-year">
+        <html:input id="ccf-sort-year" class="ccf-check" type="radio" name="ccf-sort-mode" value="year" />
+        <html:span>年份优先（新到旧，同年按等级）</html:span>
+      </html:label>
+      <html:p id="ccf-sort-hint" class="ccf-projects-hint">请点击文献列表的 CCF 列进行排序；如顺序相反，请再点击一次。排序年份与 CCF 列展示规则一致；反向排序会同时反转年份与等级的顺序。</html:p>
+      <html:p id="ccf-sort-validation" class="ccf-display-validation" role="status" aria-live="polite"></html:p>
+    </html:div>
+  </html:fieldset>
+
+  <html:fieldset class="ccf-section">
     <html:legend>处理范围</html:legend>
     <html:label class="ccf-field" for="ccf-init-scope">
       <html:span class="ccf-field-label">选择需要处理的文献范围</html:span>

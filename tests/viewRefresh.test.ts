@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   invalidateItemRows,
+  refreshAllItemTrees,
   refreshItemsViewAndMaintainSelection,
+  setCCFSortColumnKey,
   softRefreshItemsView,
 } from "../src/modules/viewRefresh";
 
@@ -22,6 +24,29 @@ function withZoteroItemsView(itemsView: any, callback: () => void) {
     (globalThis as any).ztoolkit = originalZtoolkit;
   }
 }
+
+async function withZoteroWindows(
+  views: any[],
+  callback: () => Promise<void>,
+): Promise<void> {
+  const originalZotero = (globalThis as any).Zotero;
+  const originalZtoolkit = (globalThis as any).ztoolkit;
+  (globalThis as any).Zotero = {
+    getActiveZoteroPane: () => ({ itemsView: views[0] }),
+    getMainWindows: () => views.map((itemsView) => ({ ZoteroPane: { itemsView } })),
+  };
+  (globalThis as any).ztoolkit = { log() {} };
+  try {
+    await callback();
+  } finally {
+    setCCFSortColumnKey(undefined);
+    (globalThis as any).Zotero = originalZotero;
+    (globalThis as any).ztoolkit = originalZtoolkit;
+  }
+}
+
+const waitForDebounce = () => new Promise<void>((resolve) => setTimeout(resolve, 350));
+const CCF_KEY = "ccfForZoteroRank-ccf-for-zotero@nyaru177.github.io";
 
 describe("Zotero item view refresh helpers", () => {
   it("invalidates specific rows for small target sets", () => {
@@ -176,6 +201,116 @@ describe("Zotero item view refresh helpers", () => {
     withZoteroItemsView(itemsView, () => {
       assert.equal(invalidateItemRows([7]), true);
       assert.equal(7 in rowCache, false);
+    });
+  });
+
+  it("sorts only views with the exact registered primary key before invalidation", async () => {
+    const events: string[] = [];
+    let resolveSort!: () => void;
+    const sorted = {
+      getSortField: () => CCF_KEY,
+      invalidateRowCache: () => events.push("sorted:cache"),
+      sort: () => {
+        events.push("sorted:sort");
+        return new Promise<void>((resolve) => { resolveSort = resolve; });
+      },
+      tree: { invalidate: () => events.push("sorted:invalidate") },
+    };
+    const other = {
+      getSortField: () => "ccfForZoteroRank",
+      invalidateRowCache: () => events.push("other:cache"),
+      sort: () => events.push("other:sort"),
+      tree: { invalidate: () => events.push("other:invalidate") },
+    };
+    await withZoteroWindows([sorted, other], async () => {
+      setCCFSortColumnKey(CCF_KEY);
+      refreshAllItemTrees({ resort: true });
+      assert.deepEqual(events, ["sorted:cache", "sorted:sort", "other:cache", "other:invalidate"]);
+      resolveSort();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      assert.equal(events.at(-1), "sorted:invalidate");
+      events.length = 0;
+      refreshAllItemTrees();
+      assert.deepEqual(events, ["sorted:cache", "sorted:invalidate", "other:cache", "other:invalidate"]);
+    });
+  });
+
+  it("debounces private-state refreshes across windows and checks the current primary sort", async () => {
+    let windowReads = 0;
+    const calls: string[] = [];
+    let field = CCF_KEY;
+    const makeView = (name: string, getSortField: () => string) => ({
+      getSortField,
+      invalidateRowCache: () => {},
+      getRowIndexByID: () => 0,
+      sort: () => { calls.push(name); },
+      tree: { invalidateRow() {}, invalidate() {} },
+    });
+    const first = makeView("first", () => field);
+    const second = makeView("second", () => CCF_KEY);
+    const other = makeView("other", () => "title");
+    await withZoteroWindows([first, second, other], async () => {
+      const zotero = (globalThis as any).Zotero;
+      const getWindows = zotero.getMainWindows;
+      zotero.getMainWindows = () => { windowReads++; return getWindows(); };
+      setCCFSortColumnKey(CCF_KEY);
+      for (let i = 0; i < 1000; i++) {
+        assert.equal(softRefreshItemsView([i + 1]), true);
+        assert.equal(refreshItemsViewAndMaintainSelection([i + 1]), true);
+      }
+      assert.equal(windowReads, 0);
+      field = "title";
+      await waitForDebounce();
+      assert.equal(windowReads, 1);
+      assert.deepEqual(calls, ["second"]);
+    });
+  });
+
+  it("queues one further sort when state changes during an in-flight sort", async () => {
+    let calls = 0;
+    let resolveFirst!: () => void;
+    const view = {
+      getSortField: () => CCF_KEY,
+      invalidateRowCache() {},
+      getRowIndexByID: () => 0,
+      sort() {
+        calls++;
+        if (calls === 1) return new Promise<void>((resolve) => { resolveFirst = resolve; });
+      },
+      tree: { invalidateRow() {}, invalidate() {} },
+    };
+    await withZoteroWindows([view], async () => {
+      setCCFSortColumnKey(CCF_KEY);
+      softRefreshItemsView([1]);
+      await waitForDebounce();
+      softRefreshItemsView([2]);
+      softRefreshItemsView([3]);
+      await waitForDebounce();
+      assert.equal(calls, 1);
+      resolveFirst();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      assert.equal(calls, 2);
+    });
+  });
+
+  it("continues refreshing when sort APIs are absent or sorting fails", async () => {
+    const invalidated: string[] = [];
+    const makeView = (name: string, sort?: () => unknown) => ({
+      getSortField: () => CCF_KEY,
+      sort,
+      tree: { invalidate: () => invalidated.push(name) },
+    });
+    const views = [
+      makeView("missing"),
+      makeView("throw", () => { throw new Error("sort failed"); }),
+      makeView("reject", () => Promise.reject(new Error("sort rejected"))),
+      { tree: { invalidate: () => invalidated.push("no-field") } },
+    ];
+    await withZoteroWindows(views, async () => {
+      setCCFSortColumnKey(CCF_KEY);
+      refreshAllItemTrees({ resort: true });
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      assert.deepEqual(invalidated.sort(), ["missing", "no-field", "reject", "throw"]);
     });
   });
 

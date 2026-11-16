@@ -3,6 +3,8 @@ import { CCFDisplayStyle, getCCFDisplayStyle } from "./displayPreferences";
 import { formatNonCcfVenueText } from "./nonCcfAliases";
 import { getColumnDisplayState } from "./rankService";
 import { ItemRankState } from "./types";
+import { CCFSortMode, getCCFSortMode } from "./sortPreferences";
+import { setCCFSortColumnKey } from "./viewRefresh";
 
 const dataKey = "ccfForZoteroRank";
 const sortDataSeparator = "\u001e";
@@ -71,6 +73,18 @@ function getSortKey(state: ItemRankState, display: string): string {
   return `900|${display}`;
 }
 
+/** 升序时年份越新越靠前；没有可靠年份的条目排在所有已知年份之后。 */
+function getYearSortKey(state: ItemRankState, display: string, year?: string): string {
+  const yearKey = year ? `0${String(9999 - Number(year)).padStart(4, "0")}` : "19999";
+  let rankKey: string;
+  if (state.status === "preprint") rankKey = "700";
+  else if (state.status === "none") rankKey = "800";
+  else if (state.status === "unknown" || (state.status === "matched" && !state.rank)) rankKey = "900";
+  else if (state.status === "ignored") rankKey = "990";
+  else rankKey = rankSortOrder[state.rank || ""] || "190";
+  return `${yearKey}${rankKey}|${state.abbr || display}`;
+}
+
 function buildTooltip(state: ItemRankState, display: string): string {
   if (!display) return "";
   const lines = [display];
@@ -91,6 +105,7 @@ export interface FormatColumnOptions {
   /** 条目 Date 字段年份，仅作兜底；venue 标注年份（state.matchYear）优先。 */
   year?: string | number;
   style?: CCFDisplayStyle;
+  sortMode?: CCFSortMode;
 }
 
 /**
@@ -142,7 +157,10 @@ export function formatColumnDataForState(
   let title = "";
 
   if (state.status === "ignored") {
-    return packColumnData(getSortKey(state, display), display, title);
+    const sortKey = options.sortMode === "year"
+      ? getYearSortKey(state, display, year)
+      : getSortKey(state, display);
+    return packColumnData(sortKey, display, title);
   }
   if (state.status === "preprint") {
     display = compact ? "arXiv" : "Preprint | arXiv";
@@ -168,11 +186,13 @@ export function formatColumnDataForState(
     display = "Unknown";
   }
 
-  // 排序键继续使用不带年份的 display，保证追加年份不改变既有排序行为；
-  // 徽章展示文本追加年份（如 "A|AAAI 2026"）。
+  // 默认模式保留原有排序；年份模式使用与徽章相同的可靠年份。
   const displayWithYear = appendYearSuffix(display, year);
   if (!title) title = buildTooltip(state, displayWithYear);
-  return packColumnData(getSortKey(state, display), displayWithYear, title);
+  const sortKey = options.sortMode === "year"
+    ? getYearSortKey(state, display, year)
+    : getSortKey(state, display);
+  return packColumnData(sortKey, displayWithYear, title);
 }
 
 function getBadgeColors(text: string) {
@@ -206,7 +226,7 @@ function getBadgeColors(text: string) {
 }
 
 export async function registerCCFColumn() {
-  await Zotero.ItemTreeManager.registerColumns({
+  const registeredKeys = await Zotero.ItemTreeManager.registerColumns({
     pluginID: config.addonID,
     dataKey,
     label: "CCF",
@@ -218,6 +238,7 @@ export async function registerCCFColumn() {
         return formatColumnDataForState(getColumnDisplayState(item), {
           year: getItemPublicationYear(item),
           style: getCCFDisplayStyle(),
+          sortMode: getCCFSortMode(),
         });
       } catch (error) {
         ztoolkit.log("CCF column dataProvider failed", error);
@@ -227,7 +248,7 @@ export async function registerCCFColumn() {
           source: "auto",
           confidence: 0,
           updatedAt: new Date().toISOString(),
-        });
+        }, { sortMode: getCCFSortMode() });
       }
     },
     renderCell: (
@@ -270,6 +291,8 @@ export async function registerCCFColumn() {
       return cell;
     },
   });
+  const registeredKey = Array.isArray(registeredKeys) ? registeredKeys[0] : undefined;
+  setCCFSortColumnKey(typeof registeredKey === "string" ? registeredKey : undefined);
 }
 
 

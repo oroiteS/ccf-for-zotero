@@ -17,6 +17,7 @@ import {
   unregisterPreferencesPane,
 } from "./modules/preferences";
 import { createZToolkit } from "./utils/ztoolkit";
+import { setCCFSortColumnKey } from "./modules/viewRefresh";
 
 async function onStartup() {
   await Promise.all([
@@ -57,6 +58,7 @@ function onShutdown(): void {
   shutdownInitialization();
   shutdownBackgroundWarmup();
   shutdownInvalidationRecompute();
+  setCCFSortColumnKey(undefined);
   unregisterPreferencesPane();
   clearRecognitionProjectObservers();
   ztoolkit.unregisterAll();

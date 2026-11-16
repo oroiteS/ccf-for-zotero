@@ -2,6 +2,7 @@ import { config } from "../../package.json";
 import { cancelBackgroundWarmup } from "./backgroundWarmup";
 import { getCCFDisplayStyle, setCCFDisplayStyle } from "./displayPreferences";
 import { getRecognitionProjects, setRecognitionProjects } from "./projectPreferences";
+import { getCCFSortMode, setCCFSortMode } from "./sortPreferences";
 import {
   cancelInitialization,
   getInitializationProgress,
@@ -412,6 +413,8 @@ export function attachInitializationPreferences(
     getControl(root, "ccf-init-cancel")?.removeEventListener("click", cancel);
     getControl(root, "ccf-display-classic")?.removeEventListener("change", changeDisplayStyle);
     getControl(root, "ccf-display-compact")?.removeEventListener("change", changeDisplayStyle);
+    getControl(root, "ccf-sort-rank")?.removeEventListener("change", changeSortMode);
+    getControl(root, "ccf-sort-year")?.removeEventListener("change", changeSortMode);
     getControl(root, "ccf-init-ccf")?.removeEventListener("change", changeProjects);
     getControl(root, "ccf-init-cas")?.removeEventListener("change", changeProjects);
     prefWindow.removeEventListener("unload", cleanup);
@@ -477,6 +480,38 @@ export function attachInitializationPreferences(
     }
   };
 
+  let lastSortMode: "rank" | "year" = "rank";
+  const showSortMode = (mode: "rank" | "year") => {
+    const rank = getControl(root, "ccf-sort-rank");
+    const year = getControl(root, "ccf-sort-year");
+    if (rank) rank.checked = mode === "rank";
+    if (year) year.checked = mode === "year";
+  };
+  const syncSortMode = () => {
+    lastSortMode = getCCFSortMode();
+    showSortMode(lastSortMode);
+  };
+  const changeSortMode = (event: Event) => {
+    if (cleaned) return;
+    const control = event.currentTarget as ValueControl | null;
+    const mode = control?.value;
+    if (!control?.checked || (mode !== "rank" && mode !== "year")) return;
+    try {
+      setCCFSortMode(mode);
+      lastSortMode = mode;
+      setText(root, "ccf-sort-validation", "");
+    } catch (error) {
+      try {
+        syncSortMode();
+      } catch (readError) {
+        showSortMode(lastSortMode);
+        log("Could not read CCF sort mode", readError);
+      }
+      setText(root, "ccf-sort-validation", "保存排序设置失败，请查看 Zotero 错误日志。");
+      log("Could not save CCF sort mode", error);
+    }
+  };
+
   const syncProjects = () => {
     const projects = getRecognitionProjects();
     const ccf = getControl(root, "ccf-init-ccf");
@@ -505,8 +540,18 @@ export function attachInitializationPreferences(
   syncDisplayStyle();
   getControl(root, "ccf-display-classic")?.addEventListener("change", changeDisplayStyle);
   getControl(root, "ccf-display-compact")?.addEventListener("change", changeDisplayStyle);
+  try {
+    syncSortMode();
+  } catch (error) {
+    showSortMode(lastSortMode);
+    setText(root, "ccf-sort-validation", "读取排序设置失败，请查看 Zotero 错误日志。");
+    log("Could not read CCF sort mode", error);
+  }
+  getControl(root, "ccf-sort-rank")?.addEventListener("change", changeSortMode);
+  getControl(root, "ccf-sort-year")?.addEventListener("change", changeSortMode);
 
   cleanupByWindow.set(prefWindow, cleanup);
+  prefWindow.addEventListener("unload", cleanup);
   if (!api) {
     setText(root, "ccf-init-status", "插件接口尚未就绪");
     setText(root, "ccf-init-detail", "请重新打开 Zotero 设置页面。");
@@ -518,7 +563,6 @@ export function attachInitializationPreferences(
   getControl(root, "ccf-init-start")?.addEventListener("click", start);
   getControl(root, "ccf-init-cancel")?.addEventListener("command", cancel);
   getControl(root, "ccf-init-cancel")?.addEventListener("click", cancel);
-  prefWindow.addEventListener("unload", cleanup);
   sync();
 
   const setIntervalFunction =

@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/github/license/oroiteS/ccf-for-zotero?style=flat-square" alt="License">
 </p>
 
-当前版本：`0.2.16`
+当前版本：`0.2.17`
 
 ## 界面预览
 
@@ -44,7 +44,7 @@
 
 ## 安装
 
-1. 前往 [Releases](https://github.com/oroiteS/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.16-zotero10.xpi`。
+1. 前往 [Releases](https://github.com/oroiteS/ccf-for-zotero/releases) 下载 `ccf-for-zotero-0.2.17-zotero10.xpi`。
 2. 打开 Zotero，进入 `工具` -> `插件`。
 3. 点击右上角齿轮，选择 `Install Add-on From File...`。
 4. 选择下载的 `.xpi` 文件，安装后重启 Zotero。
@@ -60,6 +60,8 @@
 「识别项目」的勾选会保存，并同时控制初始化项目及插件的右键、工具菜单：取消勾选后对应菜单隐藏，重新勾选即可恢复。这个设置不删除数据，也不关闭后台识别或文献列表中的对应列。
 
 在同一设置页的「显示设置」中可切换 CCF 列的经典或简洁格式：默认经典格式（如 `CCF A | AAAI 2027`），简洁格式如 `A|AAAI 2027`、`arXiv 2027`。此设置不影响 CAS 列或识别结果。
+
+「CCF 排序模式」默认保留原有的等级优先排序，也可选择年份优先，再点击文献列表的 CCF 列：年份从新到旧，同年按 A、B、C、T1、T2、T3、preprint、None、Unknown 顺序排列。年份沿用 CCF 徽章的显示规则，没有可靠年份的条目排在已知年份之后；带 arXiv 信号但已匹配 CCF 的条目仍按其匹配等级排序。如果当前排序方向相反，再点击一次 CCF 列；反向时年份和等级顺序都会反转。
 
 ## 识别结果
 
@@ -135,9 +137,9 @@ CAS 快照的版本、来源哈希和字段说明记录在仓库代码与 [发�
 ## 开发
 
 ```powershell
-npm ci
-npm run check
-npm run audit:cas-catalog
+pnpm install --frozen-lockfile
+pnpm run check
+pnpm run audit:cas-catalog
 ```
 
 构建产物位于 `.scaffold/build/`。

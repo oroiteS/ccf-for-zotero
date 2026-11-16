@@ -1,6 +1,92 @@
 type RefreshTarget = Zotero.Item | string | number | undefined | null;
 
 const MAX_DIRECT_ROW_LOOKUPS = 250;
+const RESORT_DEBOUNCE_MS = 250;
+
+let ccfSortColumnKey: string | undefined;
+let resortTimer: ReturnType<typeof setTimeout> | undefined;
+const sortingViews = new WeakMap<object, { pending: boolean }>();
+
+/** 接收 registerColumns 返回的完整 key，而不是未加插件前缀的 dataKey。 */
+export function setCCFSortColumnKey(key: string | undefined): void {
+  const nextKey = key || undefined;
+  if (ccfSortColumnKey !== nextKey && resortTimer !== undefined) {
+    clearTimeout(resortTimer);
+    resortTimer = undefined;
+  }
+  ccfSortColumnKey = nextKey;
+}
+
+function getItemViews(): Set<any> {
+  const views = new Set<any>();
+  for (const win of Zotero.getMainWindows?.() || []) {
+    const view = (win as any).ZoteroPane?.itemsView;
+    if (view) views.add(view);
+  }
+  const activeView = Zotero.getActiveZoteroPane?.()?.itemsView;
+  if (activeView) views.add(activeView);
+  return views;
+}
+
+function isCCFPrimarySort(view: any): boolean {
+  if (!ccfSortColumnKey || typeof view?.getSortField !== "function") return false;
+  try {
+    return view.getSortField() === ccfSortColumnKey;
+  } catch (error) {
+    ztoolkit.log("Could not determine Zotero item view sort field", error);
+    return false;
+  }
+}
+
+function invalidateItemTree(view: any): void {
+  if (!callViewMethod(view?.tree || view?._tree, "invalidate")) {
+    callViewMethod(view, "invalidate");
+  }
+}
+
+/** 同一视图的异步排序串行化；排序期间的新变动合并为下一次排序。 */
+function resortItemTree(view: any, cacheAlreadyCleared = false): boolean {
+  if (!isCCFPrimarySort(view) || typeof view?.sort !== "function") return false;
+  const current = sortingViews.get(view);
+  if (current) {
+    current.pending = true;
+    return true;
+  }
+  const state = { pending: false };
+  sortingViews.set(view, state);
+  if (!cacheAlreadyCleared) clearItemTreeRowCache(view, true);
+  let result: unknown;
+  try {
+    result = view.sort();
+  } catch (error) {
+    ztoolkit.log("Could not sort Zotero item view", error);
+    sortingViews.delete(view);
+    invalidateItemTree(view);
+    return true;
+  }
+  void Promise.resolve(result)
+    .catch((error) => ztoolkit.log("Could not sort Zotero item view", error))
+    .then(() => {
+      sortingViews.delete(view);
+      invalidateItemTree(view);
+      if (state.pending) resortItemTree(view);
+    });
+  return true;
+}
+
+/** 高频单条刷新仅排队一次，并在执行时检查各窗口当前的主排序列。 */
+function scheduleCCFResort(): void {
+  if (!ccfSortColumnKey) return;
+  if (resortTimer !== undefined) clearTimeout(resortTimer);
+  resortTimer = setTimeout(() => {
+    resortTimer = undefined;
+    try {
+      for (const view of getItemViews()) resortItemTree(view);
+    } catch (error) {
+      ztoolkit.log("Could not schedule Zotero item view sorting", error);
+    }
+  }, RESORT_DEBOUNCE_MS);
+}
 
 function callViewMethod(target: any, method: string): boolean {
   if (typeof target?.[method] !== "function") return false;
@@ -206,20 +292,11 @@ function invalidateActiveItemTree(): boolean {
 }
 
 /** 显示设置是全局的，清除所有已打开主窗口的行缓存并重绘。 */
-export function refreshAllItemTrees(): void {
+export function refreshAllItemTrees(options: { resort?: boolean } = {}): void {
   try {
-    const views = new Set<any>();
-    for (const win of Zotero.getMainWindows?.() || []) {
-      const view = (win as any).ZoteroPane?.itemsView;
-      if (view) views.add(view);
-    }
-    const activeView = Zotero.getActiveZoteroPane?.()?.itemsView;
-    if (activeView) views.add(activeView);
-    for (const view of views) {
+    for (const view of getItemViews()) {
       clearItemTreeRowCache(view, true);
-      if (!callViewMethod(view.tree || view._tree, "invalidate")) {
-        callViewMethod(view, "invalidate");
-      }
+      if (!options.resort || !resortItemTree(view, true)) invalidateItemTree(view);
     }
   } catch (error) {
     ztoolkit.log("Could not refresh all Zotero item views", error);
@@ -227,6 +304,7 @@ export function refreshAllItemTrees(): void {
 }
 
 export function softRefreshItemsView(targets: RefreshTarget[] = []): boolean {
+  scheduleCCFResort();
   if (invalidateItemRows(targets)) return true;
 
   // 定向行失效失败（目标行不在当前视图、行 API 缺失等）时退化为
@@ -237,6 +315,7 @@ export function softRefreshItemsView(targets: RefreshTarget[] = []): boolean {
 export function refreshItemsViewAndMaintainSelection(
   targets: RefreshTarget[] = [],
 ): boolean {
+  scheduleCCFResort();
   if (invalidateItemRows(targets)) return true;
 
   if (targets.length > 0) {

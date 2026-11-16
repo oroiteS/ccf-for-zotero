@@ -1,7 +1,8 @@
 {
   "name": "ccf-for-zotero",
   "type": "module",
-  "version": "0.2.16",
+  "version": "0.2.17",
+  "packageManager": "pnpm@12.21.0",
   "description": "Offline CCF and CAS ranking badges for Zotero.",
   "config": {
     "addonName": "CCF for Zotero",
@@ -18,9 +19,9 @@
   "homepage": "https://github.com/oroiteS/ccf-for-zotero#readme",
   "license": "AGPL-3.0-or-later",
   "scripts": {
-    "build": "node tools/build.mjs",
+    "build": "pnpm exec zotero-plugin build && pnpm exec tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "check": "npm run test && npm run build",
+    "check": "pnpm run test && pnpm run build",
     "build:ccf-catalog": "node tools/build-ccf-catalog.mjs",
     "build:cas-catalog": "node tools/build-cas-catalog-from-official-export.mjs",
     "audit:cas-catalog": "node tools/audit-cas-catalog.mjs",
