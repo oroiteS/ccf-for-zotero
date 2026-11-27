@@ -1,7 +1,7 @@
 {
-  "version": "CCF-2026-v7-pdf-audited",
+  "version": "CCF-2026-v7-pdf-audited-r2",
   "updateDate": "2026-03-17",
-  "source": "Seeded from CCF-Rank src/data/ccf-conferences.json, then audited against the local official PDF 中国计算机学会推荐国际学术会议和期刊目录第七版（2026年3月更新）.pdf on 2026-08-22.",
+  "source": "Seeded from CCF-Rank src/data/ccf-conferences.json, audited against the local official PDF 中国计算机学会推荐国际学术会议和期刊目录第七版（2026年3月更新）.pdf on 2026-08-22, and synchronized official 7th-edition renames/typos on 2026-11-27.",
   "venues": [
     {
       "kind": "conference",
@@ -383,12 +383,12 @@
     {
       "kind": "conference",
       "abbr": "RTAS",
-      "fullName": "IEEE Real-Time and Embedded Technology and ApplicationsSymposium",
+      "fullName": "IEEE Real-Time and Embedded Technology and Applications Symposium",
       "rank": "B",
       "category": "计算机体系结构/并行与分布计算/存储系统",
       "aliases": [
         "RTAS",
-        "IEEE Real-Time and Embedded Technology and ApplicationsSymposium"
+        "IEEE Real-Time and Embedded Technology and Applications Symposium"
       ]
     },
     {
@@ -1671,12 +1671,12 @@
     {
       "kind": "conference",
       "abbr": "OOPSLA",
-      "fullName": "Conference on Object-Oriented Programming Systems, Languages,and Applications",
+      "fullName": "Conference on Object-Oriented Programming Systems, Languages, and Applications",
       "rank": "A",
       "category": "软件工程/系统软件/程序设计语言",
       "aliases": [
         "OOPSLA",
-        "Conference on Object-Oriented Programming Systems, Languages,and Applications"
+        "Conference on Object-Oriented Programming Systems, Languages, and Applications"
       ]
     },
     {
@@ -1804,12 +1804,12 @@
     {
       "kind": "conference",
       "abbr": "LCTES",
-      "fullName": "ACM SIGPLAN/SIGBED International Conference on Languages, Compilers andTools for Embedded Systems",
+      "fullName": "ACM SIGPLAN/SIGBED International Conference on Languages, Compilers and Tools for Embedded Systems",
       "rank": "B",
       "category": "软件工程/系统软件/程序设计语言",
       "aliases": [
         "LCTES",
-        "ACM SIGPLAN/SIGBED International Conference on Languages, Compilers andTools for Embedded Systems"
+        "ACM SIGPLAN/SIGBED International Conference on Languages, Compilers and Tools for Embedded Systems"
       ]
     },
     {
@@ -1836,25 +1836,25 @@
     },
     {
       "kind": "conference",
-      "abbr": "CSOC",
+      "abbr": "ICSOC",
       "fullName": "International Conference on Service Oriented Computing",
       "rank": "B",
       "category": "软件工程/系统软件/程序设计语言",
       "aliases": [
-        "CSOC",
         "ICSOC",
-        "International Conference on Service Oriented Computing"
+        "International Conference on Service Oriented Computing",
+        "International Conference on Service-Oriented Computing"
       ]
     },
     {
       "kind": "conference",
       "abbr": "SANER",
-      "fullName": "IEEE International Conference on Software Analysis, Evolution,and Reengineering",
+      "fullName": "IEEE International Conference on Software Analysis, Evolution, and Reengineering",
       "rank": "B",
       "category": "软件工程/系统软件/程序设计语言",
       "aliases": [
         "SANER",
-        "IEEE International Conference on Software Analysis, Evolution,and Reengineering"
+        "IEEE International Conference on Software Analysis, Evolution, and Reengineering"
       ]
     },
     {
@@ -1871,12 +1871,12 @@
     {
       "kind": "conference",
       "abbr": "VMCAI",
-      "fullName": "International Conference on Verification,Model Checking, and Abstract Interpretation",
+      "fullName": "International Conference on Verification, Model Checking, and Abstract Interpretation",
       "rank": "B",
       "category": "软件工程/系统软件/程序设计语言",
       "aliases": [
         "VMCAI",
-        "International Conference on Verification,Model Checking, and Abstract Interpretation"
+        "International Conference on Verification, Model Checking, and Abstract Interpretation"
       ]
     },
     {
@@ -2399,23 +2399,23 @@
     {
       "kind": "conference",
       "abbr": "EDBT",
-      "fullName": "International Conference on Extending DatabaseTechnology",
+      "fullName": "International Conference on Extending Database Technology",
       "rank": "B",
       "category": "数据库/数据挖掘/内容检索",
       "aliases": [
         "EDBT",
-        "International Conference on Extending DatabaseTechnology"
+        "International Conference on Extending Database Technology"
       ]
     },
     {
       "kind": "conference",
       "abbr": "CIDR",
-      "fullName": "Conference on Innovative DataSystems Research",
+      "fullName": "Conference on Innovative Data Systems Research",
       "rank": "B",
       "category": "数据库/数据挖掘/内容检索",
       "aliases": [
         "CIDR",
-        "Conference on Innovative DataSystems Research"
+        "Conference on Innovative Data Systems Research"
       ]
     },
     {
@@ -2900,11 +2900,12 @@
     {
       "kind": "conference",
       "abbr": "VR",
-      "fullName": "IEEE Virtual Reality",
+      "fullName": "IEEE Conference on Virtual Reality and 3D User Interfaces",
       "rank": "A",
       "category": "计算机图形学与多媒体",
       "aliases": [
         "VR",
+        "IEEE Conference on Virtual Reality and 3D User Interfaces",
         "IEEE Virtual Reality"
       ]
     },
@@ -2933,12 +2934,12 @@
     {
       "kind": "conference",
       "abbr": "I3D",
-      "fullName": "ACM SIGGRAPH Symposium onInteractive 3D Graphics and Games",
+      "fullName": "ACM SIGGRAPH Symposium on Interactive 3D Graphics and Games",
       "rank": "B",
       "category": "计算机图形学与多媒体",
       "aliases": [
         "I3D",
-        "ACM SIGGRAPH Symposium onInteractive 3D Graphics and Games"
+        "ACM SIGGRAPH Symposium on Interactive 3D Graphics and Games"
       ]
     },
     {
@@ -3010,23 +3011,23 @@
     {
       "kind": "conference",
       "abbr": "ICASSP",
-      "fullName": "IEEE International Conference on Acoustics,Speech and Signal Processing",
+      "fullName": "IEEE International Conference on Acoustics, Speech and Signal Processing",
       "rank": "B",
       "category": "计算机图形学与多媒体",
       "aliases": [
         "ICASSP",
-        "IEEE International Conference on Acoustics,Speech and Signal Processing"
+        "IEEE International Conference on Acoustics, Speech and Signal Processing"
       ]
     },
     {
       "kind": "conference",
       "abbr": "ICME",
-      "fullName": "IEEE International Conference on Multimedia& Expo",
+      "fullName": "IEEE International Conference on Multimedia & Expo",
       "rank": "B",
       "category": "计算机图形学与多媒体",
       "aliases": [
         "ICME",
-        "IEEE International Conference on Multimedia& Expo"
+        "IEEE International Conference on Multimedia & Expo"
       ]
     },
     {
@@ -3452,12 +3453,12 @@
     {
       "kind": "conference",
       "abbr": "UAI",
-      "fullName": "Conference on Uncertainty in ArtificialIntelligence",
+      "fullName": "Conference on Uncertainty in Artificial Intelligence",
       "rank": "B",
       "category": "人工智能",
       "aliases": [
         "UAI",
-        "Conference on Uncertainty in ArtificialIntelligence"
+        "Conference on Uncertainty in Artificial Intelligence"
       ]
     },
     {
@@ -3485,12 +3486,12 @@
     {
       "kind": "conference",
       "abbr": "NAACL",
-      "fullName": "North American Chapter of the Associationfor Computational Linguistics",
+      "fullName": "North American Chapter of the Association for Computational Linguistics",
       "rank": "B",
       "category": "人工智能",
       "aliases": [
         "NAACL",
-        "North American Chapter of the Associationfor Computational Linguistics"
+        "North American Chapter of the Association for Computational Linguistics"
       ]
     },
     {
@@ -3749,11 +3750,12 @@
     {
       "kind": "conference",
       "abbr": "CSCW",
-      "fullName": "ACM Conference on Computer Supported Cooperative Work and Social Computing",
+      "fullName": "ACM Conference on Computer-Supported Cooperative Work and Social Computing",
       "rank": "A",
       "category": "人机交互与普适计算",
       "aliases": [
         "CSCW",
+        "ACM Conference on Computer-Supported Cooperative Work and Social Computing",
         "ACM Conference on Computer Supported Cooperative Work and Social Computing"
       ]
     },
@@ -4034,11 +4036,12 @@
     {
       "kind": "conference",
       "abbr": "WWW",
-      "fullName": "International World Wide Web Conference",
+      "fullName": "The Web Conference",
       "rank": "A",
       "category": "交叉/综合/新兴",
       "aliases": [
         "WWW",
+        "The Web Conference",
         "International World Wide Web Conference"
       ]
     },
@@ -4100,12 +4103,12 @@
     {
       "kind": "conference",
       "abbr": "RECOMB",
-      "fullName": "Annual International Conference on Research inComputational Molecular Biology",
+      "fullName": "Annual International Conference on Research in Computational Molecular Biology",
       "rank": "B",
       "category": "交叉/综合/新兴",
       "aliases": [
         "RECOMB",
-        "Annual International Conference on Research inComputational Molecular Biology"
+        "Annual International Conference on Research in Computational Molecular Biology"
       ]
     },
     {
@@ -4603,11 +4606,12 @@
     {
       "kind": "journal",
       "abbr": "TON",
-      "fullName": "IEEE/ACM Transactions on Networking",
+      "fullName": "IEEE Transactions on Networking",
       "rank": "A",
       "category": "计算机网络",
       "aliases": [
         "TON",
+        "IEEE Transactions on Networking",
         "IEEE/ACM Transactions on Networking"
       ]
     },
@@ -5726,12 +5730,12 @@
     {
       "kind": "journal",
       "abbr": "CC",
-      "fullName": "Computational complexity",
+      "fullName": "Computational Complexity",
       "rank": "B",
       "category": "计算机科学理论",
       "aliases": [
         "CC",
-        "Computational complexity"
+        "Computational Complexity"
       ]
     },
     {
@@ -6000,12 +6004,11 @@
     {
       "kind": "journal",
       "abbr": "TOMM",
-      "fullName": "ACM Transactions on Multimedia Computing,Communications and Applications",
+      "fullName": "ACM Transactions on Multimedia Computing, Communications and Applications",
       "rank": "B",
       "category": "计算机图形学与多媒体",
       "aliases": [
         "TOMM",
-        "ACM Transactions on Multimedia Computing,Communications and Applications",
         "ACM Transactions on Multimedia Computing, Communications and Applications",
         "ACM Transactions on Multimedia Computing, Communications, and Applications",
         "ACM Trans. Multimedia Comput. Commun. Appl.",
@@ -6387,11 +6390,12 @@
     {
       "kind": "journal",
       "abbr": "TASLP",
-      "fullName": "IEEE/ACM Transactions on Audio, Speech and Language Processing",
+      "fullName": "IEEE Transactions on Audio, Speech and Language Processing",
       "rank": "B",
       "category": "人工智能",
       "aliases": [
         "TASLP",
+        "IEEE Transactions on Audio, Speech and Language Processing",
         "IEEE/ACM Transactions on Audio, Speech and Language Processing"
       ]
     },
@@ -7242,11 +7246,13 @@
     {
       "kind": "journal",
       "abbr": "TCBB",
-      "fullName": "IEEE-ACM Transactions on Computational Biology and Bioinformatics",
+      "fullName": "IEEE/ACM Transactions on Computational Biology and Bioinformatics",
       "rank": "B",
       "category": "交叉/综合/新兴",
       "aliases": [
         "TCBB",
+        "IEEE/ACM Transactions on Computational Biology and Bioinformatics",
+        "IEEE Transactions on Computational Biology and Bioinformatics",
         "IEEE-ACM Transactions on Computational Biology and Bioinformatics"
       ]
     },

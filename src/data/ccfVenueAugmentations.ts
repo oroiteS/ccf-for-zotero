@@ -60,7 +60,7 @@ export const ccfVenueAugmentations: Record<string, string[]> = {
     "Empirical Methods in Natural Language Processing",
     "Proceedings of the Conference on Empirical Methods in Natural Language Processing",
   ],
-  "North American Chapter of the Associationfor Computational Linguistics": [
+  "North American Chapter of the Association for Computational Linguistics": [
     "Conference of the North American Chapter of the Association for Computational Linguistics",
     "North American Chapter of the Association for Computational Linguistics",
     "NAACL-HLT",
@@ -80,7 +80,7 @@ export const ccfVenueAugmentations: Record<string, string[]> = {
     "Research and Development in Information Retrieval",
     "SIGIR Conference on Research and Development in Information Retrieval",
   ],
-  "International World Wide Web Conference": [
+  "The Web Conference": [
     "The Web Conference",
     "The Web Conf",
     "World Wide Web Conference",
@@ -189,7 +189,9 @@ export const ccfVenueAugmentations: Record<string, string[]> = {
     "IMWUT",
     "Pervasive and Ubiquitous Computing",
   ],
-  "ACM Conference on Computer Supported Cooperative Work and Social Computing": [
+  "ACM Conference on Computer-Supported Cooperative Work and Social Computing": [
+    "ACM Conference on Computer Supported Cooperative Work and Social Computing",
+    "Computer-Supported Cooperative Work and Social Computing",
     "Computer Supported Cooperative Work and Social Computing",
     "Computer Supported Cooperative Work",
   ],
@@ -243,7 +245,10 @@ export const ccfVenueAugmentations: Record<string, string[]> = {
     "IEEE Trans. Neural Netw. Learn. Syst.",
     "TNNLS",
   ],
-  "IEEE/ACM Transactions on Audio, Speech and Language Processing": [
+  "IEEE Transactions on Audio, Speech and Language Processing": [
+    "IEEE/ACM Transactions on Audio, Speech and Language Processing",
+    "IEEE Trans. Audio, Speech and Lang. Proc.",
+    "IEEE Trans Audio Speech Lang Proc",
     "IEEE/ACM Trans. Audio, Speech and Lang. Proc.",
     "IEEE/ACM Trans Audio Speech Lang Proc",
     "TASLP",
@@ -301,7 +306,9 @@ export const ccfVenueAugmentations: Record<string, string[]> = {
     "ACM Trans. Comput.-Hum. Interact.",
     "TOCHI",
   ],
-  "IEEE/ACM Transactions on Networking": [
+  "IEEE Transactions on Networking": [
+    "IEEE/ACM Transactions on Networking",
+    "IEEE Trans. Netw.",
     "IEEE/ACM Trans. Netw.",
     "TON",
   ],
@@ -310,10 +317,6 @@ export const ccfVenueAugmentations: Record<string, string[]> = {
     "TIST",
   ],
   "ACM Transactions on Multimedia Computing, Communications and Applications": [
-    "ACM Trans. Multimedia Comput. Commun. Appl.",
-    "TOMM",
-  ],
-  "ACM Transactions on Multimedia Computing,Communications and Applications": [
     "ACM Trans. Multimedia Comput. Commun. Appl.",
     "TOMM",
   ],

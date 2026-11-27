@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.2.19
+
+### 更新与修复
+
+- **同步 CCF 第七版（2026）目录更名与拼写修正**：
+  - 补齐 4 个官方更名后的新全称并保留原名称为别名：`TON`（`IEEE Transactions on Networking`）、`VR`（`IEEE Conference on Virtual Reality and 3D User Interfaces`）、`TASLP`（`IEEE Transactions on Audio, Speech and Language Processing`）、`WWW`（`The Web Conference`），同步更新 `ccfVenueAugmentations` 键与 ISO-4 缩写。
+  - 修复连字符/斜杠差异导致的漏匹配：`TCBB` 补齐 `IEEE/ACM Transactions on Computational Biology and Bioinformatics` 与更名后的 `IEEE Transactions on Computational Biology and Bioinformatics`（保留历史 `IEEE-ACM` 写法）；`CSCW` 补齐 `ACM Conference on Computer-Supported Cooperative Work and Social Computing`。
+  - 修正 `ICSOC` 简称（由 `CSOC` 改为 `ICSOC`），补充带连字符全称 `International Conference on Service-Oriented Computing`，并移除裸别名 `CSOC`，避免与独立的 Computer Science On-line Conference（`CSOC`）误匹配。
+  - 修正目录中 15 处 PDF 提取造成的空格/大小写拼写问题（含 `NAACL`、`OOPSLA`、`RTAS`、`LCTES`、`SANER`、`VMCAI`、`EDBT`、`CIDR`、`I3D`、`ICASSP`、`ICME`、`UAI`、`RECOMB`、`CC` 及 `TOMM`），保持原有 682 条国际目录与 68 条中文高质量期刊（共 750 条）完整覆盖。
+- **修复 `Proceedings of the IEEE` 识别失效**：在剥离会议论文集样板前缀 `Proceedings of (the)` 前增加窄范围期刊精确全称匹配，确保 `Proceedings of the IEEE` 正确识别为 CCF-A（`Proc. IEEE`），同时裸 `IEEE` 保持不误匹配。
+- **升级目录版本号触发自动缓存重算**：目录版本更新为 `CCF-2026-v7-pdf-audited-r2`，升级插件后既有自动识别缓存会自动失效重算，手动标注条目不受影响。
+
+### 校验
+
+- 自动化测试：223 项全部通过（新增更名期刊/会议、连字符/斜杠变体、`Proceedings of the IEEE` 正反例、`ICSOC`/`CSOC` 正反例回归测试）。
+- TypeScript 类型检查及 Zotero 插件构建通过（版本 `0.2.19`）。
+
 ## v0.2.18
 
 ### 新增

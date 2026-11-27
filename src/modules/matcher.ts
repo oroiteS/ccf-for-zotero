@@ -648,6 +648,25 @@ export function findVenue(
   value: string,
   kindHint?: CCFKind,
 ): MatchResult | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  // 少数期刊的正式全称本身以 "Proceedings of ..." 开头（如 "Proceedings of the IEEE"），
+  // 在 stripBoilerplate 剥离会议论文集样板前缀前先做一次窄范围的期刊精确全称检查。
+  const rawNormalized = normalizeText(trimmed);
+  if (/^proceedings of\b/.test(rawNormalized)) {
+    const rawJournalFull = pickBest(
+      (index.fullNameMap.get(rawNormalized) || []).filter(
+        (entry) => entry.venue.kind === "journal",
+      ),
+      trimmed,
+      kindHint,
+    );
+    if (rawJournalFull) {
+      return toMatchResult(rawJournalFull, trimmed, 0.96, "精确全称匹配");
+    }
+  }
+
   const stripped = stripBoilerplate(value);
   if (!stripped) return undefined;
 

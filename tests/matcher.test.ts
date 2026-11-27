@@ -29,6 +29,7 @@ import {
 import { clearStorageMemoryCache, getStoredState } from "../src/modules/storage";
 import {
   getItemInputFingerprint,
+  resolveItemMatch,
   resolveVenueCandidates,
 } from "../src/modules/venueResolver";
 
@@ -86,8 +87,24 @@ describe("local CCF matcher", () => {
     ["INTER-SPEECH", "B", "INTERSPEECH"],
     ["IEEE International Conference on Peer-to-Peer Computing", "C", "P2P"],
     ["USENIX Symposium on Operating Systems Design and Implementation", "A", "OSDI"],
-    ["ICSOC", "B", "CSOC"],
-    ["CSOC", "B", "CSOC"],
+    ["ICSOC", "B", "ICSOC"],
+    ["International Conference on Service-Oriented Computing", "B", "ICSOC"],
+    ["International Conference on Service-Oriented Computing (ICSOC)", "B", "ICSOC"],
+    ["Proceedings of the IEEE", "A", "Proc. IEEE"],
+    ["IEEE Transactions on Networking", "A", "TON"],
+    ["IEEE/ACM Transactions on Networking", "A", "TON"],
+    ["IEEE Conference on Virtual Reality and 3D User Interfaces", "A", "VR"],
+    ["IEEE Virtual Reality", "A", "VR"],
+    ["IEEE Transactions on Audio, Speech and Language Processing", "B", "TASLP"],
+    ["IEEE/ACM Transactions on Audio, Speech and Language Processing", "B", "TASLP"],
+    ["The Web Conference", "A", "WWW"],
+    ["International World Wide Web Conference", "A", "WWW"],
+    ["IEEE/ACM Transactions on Computational Biology and Bioinformatics", "B", "TCBB"],
+    ["IEEE Transactions on Computational Biology and Bioinformatics", "B", "TCBB"],
+    ["IEEE-ACM Transactions on Computational Biology and Bioinformatics", "B", "TCBB"],
+    ["ACM Conference on Computer-Supported Cooperative Work and Social Computing", "A", "CSCW"],
+    ["ACM Conference on Computer Supported Cooperative Work and Social Computing", "A", "CSCW"],
+    ["North American Chapter of the Association for Computational Linguistics", "B", "NAACL"],
     [
       "International Conference on Computer-Aided Design and Computer Graphics Processing",
       "C",
@@ -103,6 +120,61 @@ describe("local CCF matcher", () => {
       assert.equal(result?.abbr, abbr);
     });
   }
+
+  it("matches Proceedings of the IEEE through resolveItemMatch without matching bare IEEE", () => {
+    const procIeee = resolveItemMatch(
+      makeItem({ publicationTitle: "Proceedings of the IEEE" }, "journalArticle"),
+    );
+    assert.equal(procIeee.status, "matched");
+    assert.equal(procIeee.rank, "A");
+    assert.equal(procIeee.abbr, "Proc. IEEE");
+
+    const bareIeee = resolveItemMatch(
+      makeItem({ publicationTitle: "IEEE" }, "journalArticle"),
+    );
+    assert.equal(bareIeee.status, "none");
+  });
+
+  it("matches hyphenated ICSOC and continuation TCBB titles while rejecting CSOC", () => {
+    const icsoc = resolveItemMatch(
+      makeItem(
+        {
+          proceedingsTitle:
+            "International Conference on Service-Oriented Computing (ICSOC)",
+        },
+        "conferencePaper",
+      ),
+    );
+    assert.equal(icsoc.status, "matched");
+    assert.equal(icsoc.rank, "B");
+    assert.equal(icsoc.abbr, "ICSOC");
+
+    const csocYear = resolveItemMatch(
+      makeItem({ proceedingsTitle: "CSOC 2024" }, "conferencePaper"),
+    );
+    assert.equal(csocYear.status, "none");
+
+    const csocFull = resolveItemMatch(
+      makeItem(
+        { proceedingsTitle: "Computer Science On-line Conference (CSOC)" },
+        "conferencePaper",
+      ),
+    );
+    assert.equal(csocFull.status, "none");
+
+    const tcbbContinuation = resolveItemMatch(
+      makeItem(
+        {
+          publicationTitle:
+            "IEEE Transactions on Computational Biology and Bioinformatics",
+        },
+        "journalArticle",
+      ),
+    );
+    assert.equal(tcbbContinuation.status, "matched");
+    assert.equal(tcbbContinuation.rank, "B");
+    assert.equal(tcbbContinuation.abbr, "TCBB");
+  });
 
   it("strips published/accepted-as conference paper boilerplate prefixes", () => {
     const cases: Array<[string, string]> = [
