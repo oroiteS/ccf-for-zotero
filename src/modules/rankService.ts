@@ -1,10 +1,12 @@
 import { getCatalogVersion, getMatcherVersion, matchCandidates } from "./matcher";
-import { resolveItemMatch } from "./venueResolver";
+import { getItemInputFingerprint, resolveItemMatch } from "./venueResolver";
 import {
+  getItemInvalidationEpoch,
   getItemKey,
   getStoredState,
   saveMatchResult,
   saveMatchResults,
+  SaveMatchResultEntry,
 } from "./storage";
 import { ITEM_STATE_VERSION, ItemRankState, MatchResult } from "./types";
 
@@ -19,6 +21,7 @@ export { ITEM_STATE_VERSION };
 export interface GetDisplayStateOptions {
   computeIfMissing?: boolean;
   validateInputFingerprint?: boolean;
+  allowStaleCatalogVersion?: boolean;
 }
 
 export interface RefreshItemsRankOptions {
@@ -66,6 +69,7 @@ export function getDisplayState(
 ): ItemRankState {
   const stored = getStoredState(item, {
     validateInputFingerprint: options.validateInputFingerprint,
+    allowStaleCatalogVersion: options.allowStaleCatalogVersion,
   });
   if (stored) {
     return stored;
@@ -92,6 +96,7 @@ export function getColumnDisplayState(item: Zotero.Item): ItemRankState {
   return getDisplayState(item, {
     computeIfMissing: false,
     validateInputFingerprint: false,
+    allowStaleCatalogVersion: true,
   });
 }
 
@@ -102,16 +107,20 @@ export function hasCachedRankState(item: Zotero.Item): boolean {
 }
 
 /**
- * 该条目是否需要（重新）计算匹配缓存：完全无缓存，或缓存结构版本低于
- * 当前实现（旧缓存缺新年份通道字段，显示会退化为 date 兜底）。warmup
- * 与失效重算应使用本函数替代 hasCachedRankState，保证升级后旧缓存迁移。
+ * 该条目是否需要（重新）计算匹配缓存：完全无缓存，或缓存的目录/匹配器/结构版本
+ * 低于当前实现。warmup、列按需迁移与失效重算应统一使用本函数，保证升级后旧缓存
+ * 平滑迁移而不覆盖手动指定/忽略状态。
  */
 export function needsRankRecompute(item: Zotero.Item): boolean {
   const stored = getStoredState(item, { validateInputFingerprint: false });
   if (!stored) return true;
   // 手动指定/忽略状态是用户意志，永不被自动重算覆盖。
   if (stored.source === "manual") return false;
-  return (stored.stateVersion ?? 1) < ITEM_STATE_VERSION;
+  return (
+    (stored.stateVersion ?? 1) < ITEM_STATE_VERSION ||
+    stored.catalogVersion !== getCatalogVersion() ||
+    stored.matcherVersion !== getMatcherVersion()
+  );
 }
 
 function toItemRankState(item: Zotero.Item, result: MatchResult): ItemRankState {
@@ -138,8 +147,13 @@ function toItemRankState(item: Zotero.Item, result: MatchResult): ItemRankState 
 }
 
 export function refreshItemRank(item: Zotero.Item) {
+  const expectedInputFingerprint = getItemInputFingerprint(item);
+  const expectedInvalidationEpoch = getItemInvalidationEpoch(item.id);
   const result = resolveItemRank(item);
-  saveMatchResult(item, result);
+  saveMatchResult(item, result, {
+    expectedInputFingerprint,
+    expectedInvalidationEpoch,
+  });
   return result;
 }
 
@@ -160,6 +174,7 @@ export async function filterItemsByDisplayStatus(
     const state = getDisplayState(item, {
       computeIfMissing: false,
       validateInputFingerprint: true,
+      allowStaleCatalogVersion: true,
     });
     processed = index + 1;
     if (statusSet.has(state.status)) {
@@ -182,7 +197,7 @@ export async function refreshItemsRank(
   options: RefreshItemsRankOptions = {},
 ): Promise<RefreshItemsRankResult> {
   const entries: Array<{ item: Zotero.Item; result: MatchResult }> = [];
-  let pendingSave: Array<{ item: Zotero.Item; result: MatchResult }> = [];
+  let pendingSave: SaveMatchResultEntry[] = [];
   const total = items.length;
   const saveBatchSize = Math.max(options.saveBatchSize || total || 1, 1);
 
@@ -190,10 +205,16 @@ export async function refreshItemsRank(
     if (options.shouldCancel?.()) break;
 
     const item = items[index];
+    const expectedInputFingerprint = getItemInputFingerprint(item);
+    const expectedInvalidationEpoch = getItemInvalidationEpoch(item.id);
     const result = resolveItemRank(item);
-    const entry = { item, result };
-    entries.push(entry);
-    pendingSave.push(entry);
+    entries.push({ item, result });
+    pendingSave.push({
+      item,
+      result,
+      expectedInputFingerprint,
+      expectedInvalidationEpoch,
+    });
 
     if (pendingSave.length >= saveBatchSize) {
       saveMatchResults(pendingSave);

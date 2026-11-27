@@ -14,6 +14,8 @@ interface StateStore {
 
 let storeCache: StateStore | undefined;
 const invalidatedItemIDs = new Set<string>();
+const itemInvalidationEpochs = new Map<string, number>();
+let nextInvalidationEpoch = 0;
 
 function emptyStore(): StateStore {
   return { version: STORE_VERSION, items: {} };
@@ -46,15 +48,30 @@ export function getItemKey(item: Zotero.Item): string {
 export function clearStorageMemoryCache() {
   storeCache = undefined;
   invalidatedItemIDs.clear();
+  itemInvalidationEpochs.clear();
+}
+
+export function getItemInvalidationEpoch(id: string | number): number {
+  return itemInvalidationEpochs.get(String(id)) ?? 0;
 }
 
 export interface GetStoredStateOptions {
   validateInputFingerprint?: boolean;
+  /**
+   * 只读列展示路径允许在目录版本升级后暂时回退展示旧缓存，
+   * 避免升级插件后整个文献库瞬间全部变为 Unknown；这些旧缓存条目仍由
+   * needsRankRecompute() 识别，并在后台队列中自动迁移至新目录版本。
+   */
+  allowStaleCatalogVersion?: boolean;
 }
 
 export function invalidateItemStates(ids: Array<string | number>) {
   for (const id of ids) {
-    invalidatedItemIDs.add(String(id));
+    if (id === undefined || id === null) continue;
+    const key = String(id);
+    invalidatedItemIDs.add(key);
+    nextInvalidationEpoch += 1;
+    itemInvalidationEpochs.set(key, nextInvalidationEpoch);
   }
 }
 
@@ -89,24 +106,75 @@ export function getStoredState(
   if (state.catalogVersion === getCatalogVersion() && state.status) {
     return state;
   }
+
+  // 只读列展示路径在目录版本升级时同样先平滑展示旧缓存，由后台重算队列异步迁移。
+  if (options.allowStaleCatalogVersion && state.status) {
+    return state;
+  }
   return undefined;
 }
 
-export function saveMatchResult(item: Zotero.Item, result: MatchResult) {
-  saveMatchResults([{ item, result }]);
+export interface SaveMatchResultEntry {
+  item: Zotero.Item;
+  result: MatchResult;
+  expectedInputFingerprint?: string;
+  expectedInvalidationEpoch?: number;
 }
 
-export function saveMatchResults(
-  entries: Array<{ item: Zotero.Item; result: MatchResult }>,
+export function saveMatchResult(
+  item: Zotero.Item,
+  result: MatchResult,
+  options?: {
+    expectedInputFingerprint?: string;
+    expectedInvalidationEpoch?: number;
+  },
 ) {
+  saveMatchResults([
+    {
+      item,
+      result,
+      expectedInputFingerprint: options?.expectedInputFingerprint,
+      expectedInvalidationEpoch: options?.expectedInvalidationEpoch,
+    },
+  ]);
+}
+
+export function saveMatchResults(entries: SaveMatchResultEntry[]) {
   if (entries.length === 0) return;
 
   const store = loadStore();
   const updatedAt = new Date().toISOString();
   const catalogVersion = getCatalogVersion();
   const matcherVersion = getMatcherVersion();
-  for (const { item, result } of entries) {
+  let committed = 0;
+
+  for (const {
+    item,
+    result,
+    expectedInputFingerprint,
+    expectedInvalidationEpoch,
+  } of entries) {
     const itemKey = getItemKey(item);
+    const currentFingerprint = getItemInputFingerprint(item);
+
+    if (result.source !== "manual") {
+      if (store.items[itemKey]?.source === "manual") {
+        continue;
+      }
+      if (
+        expectedInputFingerprint !== undefined &&
+        currentFingerprint !== expectedInputFingerprint
+      ) {
+        continue;
+      }
+      if (
+        expectedInvalidationEpoch !== undefined &&
+        getItemInvalidationEpoch(item.id) !== expectedInvalidationEpoch
+      ) {
+        continue;
+      }
+    }
+
     invalidatedItemIDs.delete(String(item.id));
     store.items[itemKey] = {
       itemKey,
@@ -118,7 +186,7 @@ export function saveMatchResults(
       category: result.category,
       venueText: result.venueText,
       confidence: result.confidence,
-      inputFingerprint: getItemInputFingerprint(item),
+      inputFingerprint: currentFingerprint,
       matchedField: result.matchedField,
       matchedValue: result.matchedValue,
       matchMethod: result.matchMethod,
@@ -131,8 +199,12 @@ export function saveMatchResults(
       matcherVersion,
       updatedAt,
     };
+    committed += 1;
   }
-  saveStore(store);
+
+  if (committed > 0) {
+    saveStore(store);
+  }
 }
 
 export function saveManualMatch(item: Zotero.Item, result: MatchResult) {
@@ -157,6 +229,9 @@ export function ignoreItems(items: Zotero.Item[]) {
   const updatedAt = new Date().toISOString();
   for (const item of items) {
     const itemKey = getItemKey(item);
+    if (item.id !== undefined && item.id !== null) {
+      invalidatedItemIDs.delete(String(item.id));
+    }
     store.items[itemKey] = {
       itemKey,
       status: "ignored",
@@ -175,6 +250,12 @@ export function clearItemStates(items: Zotero.Item[]) {
   const store = loadStore();
   for (const item of items) {
     delete store.items[getItemKey(item)];
+    if (item.id !== undefined && item.id !== null) {
+      const key = String(item.id);
+      invalidatedItemIDs.delete(key);
+      nextInvalidationEpoch += 1;
+      itemInvalidationEpochs.set(key, nextInvalidationEpoch);
+    }
   }
   saveStore(store);
 }

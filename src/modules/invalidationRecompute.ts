@@ -44,6 +44,7 @@ let nextJobID = 1;
 let activeJob: RecomputeJob | undefined;
 let generation = 0;
 const pendingIDs = new Set<string>();
+const inFlightIDs = new Set<string>();
 
 let timerHandle: unknown;
 let clearTimerFn: ((handle: unknown) => void) | undefined;
@@ -95,6 +96,7 @@ function scheduleRecompute(delayMs: number): void {
   } else {
     clearTimerFn = (handle) => clearTimeout(handle as any);
     timerHandle = setTimeout(fire, delayMs);
+    (timerHandle as any)?.unref?.();
   }
 }
 
@@ -196,6 +198,27 @@ export function queueInvalidationRecompute(
 }
 
 /**
+ * 被动触发的旧版本/无缓存条目后台迁移队列（供列渲染热路径调用）。
+ * 与 modify 失效队列的区别：已排队、正在重算或已有待触发定时器时，
+ * 仅追加新条目而不取消/顺延既有定时器，避免连续滚动或悬停重绘导致
+ * 后台迁移被无限推迟。
+ */
+export function queueStaleRecompute(ids: Array<string | number>): void {
+  if (!ids || ids.length === 0) return;
+  let added = false;
+  for (const id of ids) {
+    if (id === undefined || id === null) continue;
+    const key = String(id);
+    if (pendingIDs.has(key) || inFlightIDs.has(key)) continue;
+    pendingIDs.add(key);
+    added = true;
+  }
+  if (!added) return;
+  if (activeJob || timerHandle !== undefined) return;
+  scheduleRecompute(RECOMPUTE_DEBOUNCE_MS);
+}
+
+/**
  * 立即处理当前排队的失效条目（也由防抖定时器调用）。
  */
 export async function runInvalidationRecomputeNow(): Promise<InvalidationRecomputeResult> {
@@ -237,6 +260,7 @@ export async function runInvalidationRecomputeNow(): Promise<InvalidationRecompu
 
   const job: RecomputeJob = { id: nextJobID++, cancelRequested: false };
   activeJob = job;
+  for (const id of ids) inFlightIDs.add(id);
   const jobGeneration = generation;
   if (total > RECOMPUTE_PROGRESS_THRESHOLD) {
     job.progressWindow = createProgressWindow(total);
@@ -294,7 +318,10 @@ export async function runInvalidationRecomputeNow(): Promise<InvalidationRecompu
     ztoolkit.log("CCF/CAS invalidation recompute failed", error);
     return { processed: done, ccfItems: ccfItems.length, casItems: casItems.length, skipped: true };
   } finally {
-    if (activeJob?.id === job.id) activeJob = undefined;
+    if (activeJob?.id === job.id) {
+      activeJob = undefined;
+      inFlightIDs.clear();
+    }
     // 运行期间又有条目被修改时，安排下一轮。
     if (pendingIDs.size > 0) {
       scheduleRecompute(RECOMPUTE_DEBOUNCE_MS);
@@ -306,6 +333,7 @@ export async function runInvalidationRecomputeNow(): Promise<InvalidationRecompu
 export function resetInvalidationRecomputeForTest(): void {
   cancelScheduledRecompute();
   pendingIDs.clear();
+  inFlightIDs.clear();
   activeJob = undefined;
   generation += 1;
 }
@@ -314,6 +342,7 @@ export function shutdownInvalidationRecompute(): void {
   generation += 1;
   cancelScheduledRecompute();
   pendingIDs.clear();
+  inFlightIDs.clear();
   if (activeJob) {
     activeJob.cancelRequested = true;
     activeJob = undefined;

@@ -1,7 +1,8 @@
 import { config } from "../../package.json";
 import { CCFDisplayStyle, getCCFDisplayStyle } from "./displayPreferences";
+import { queueStaleRecompute } from "./invalidationRecompute";
 import { formatNonCcfVenueText } from "./nonCcfAliases";
-import { getColumnDisplayState } from "./rankService";
+import { getColumnDisplayState, needsRankRecompute } from "./rankService";
 import { ItemRankState } from "./types";
 import { CCFSortMode, getCCFSortMode } from "./sortPreferences";
 import { setCCFSortColumnKey } from "./viewRefresh";
@@ -235,7 +236,20 @@ export async function registerCCFColumn() {
     dataProvider: (item: Zotero.Item) => {
       if (!item || item.isAttachment() || item.isNote()) return "";
       try {
-        return formatColumnDataForState(getColumnDisplayState(item), {
+        const state = getColumnDisplayState(item);
+        // 对可见条目中尚未缓存或缓存版本落后（目录/匹配器/结构升级）的普通条目，
+        // 异步排入防抖后台队列自动迁移，避免受限于启动 80 条预热而长期停留旧状态或 Unknown。
+        if (
+          item.id !== undefined &&
+          item.id !== null &&
+          (typeof (item as any).isRegularItem !== "function" ||
+            (item as any).isRegularItem()) &&
+          typeof (Zotero as any)?.Items?.get === "function" &&
+          needsRankRecompute(item)
+        ) {
+          queueStaleRecompute([item.id]);
+        }
+        return formatColumnDataForState(state, {
           year: getItemPublicationYear(item),
           style: getCCFDisplayStyle(),
           sortMode: getCCFSortMode(),

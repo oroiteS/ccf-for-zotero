@@ -5,7 +5,16 @@ import {
   registerCCFColumn,
   unpackColumnData,
 } from "../src/modules/column";
-import { ItemRankState } from "../src/modules/types";
+import {
+  hasPendingInvalidationRecompute,
+  resetInvalidationRecomputeForTest,
+  runInvalidationRecomputeNow,
+} from "../src/modules/invalidationRecompute";
+import { getCatalogVersion, getMatcherVersion } from "../src/modules/matcher";
+import { getColumnDisplayState, needsRankRecompute } from "../src/modules/rankService";
+import { clearStorageMemoryCache } from "../src/modules/storage";
+import { ITEM_STATE_VERSION, ItemRankState } from "../src/modules/types";
+import { setCCFSortColumnKey } from "../src/modules/viewRefresh";
 
 function buildState(overrides: Partial<ItemRankState> = {}): ItemRankState {
   return {
@@ -197,5 +206,186 @@ describe("CCF column display formatting", () => {
     const { display } = unpackColumnData(packed);
 
     assert.equal(display, "CCF B | AAAI");
+  });
+
+  it("keeps showing stale catalog cache in the column and migrates visible items in background", async () => {
+    const prefs = new Map<string, string>();
+    const arxivItem: any = {
+      libraryID: 1,
+      id: 501,
+      itemType: "webpage",
+      isAttachment: () => false,
+      isNote: () => false,
+      isRegularItem: () => true,
+      getField: (field: string) =>
+        ({
+          title: "PersonaManifold",
+          date: "2026/09/28",
+          url: "https://arxiv.org/abs/2609.34571v1",
+        })[field] || "",
+    };
+    const aclItem: any = {
+      libraryID: 1,
+      id: 502,
+      itemType: "webpage",
+      isAttachment: () => false,
+      isNote: () => false,
+      isRegularItem: () => true,
+      getField: (field: string) =>
+        ({
+          title: "Preference Heads",
+          date: "2026/04/24",
+          url: "https://arxiv.org/abs/2604.22345v1",
+          extra: "CCF Venue: ACL 2026",
+        })[field] || "",
+    };
+    const procIeeeItem: any = {
+      libraryID: 1,
+      id: 503,
+      itemType: "journalArticle",
+      isAttachment: () => false,
+      isNote: () => false,
+      isRegularItem: () => true,
+      getField: (field: string) =>
+        ({
+          publicationTitle: "Proceedings of the IEEE",
+          date: "2025",
+        })[field] || "",
+    };
+    const annotationItem: any = {
+      libraryID: 1,
+      id: 504,
+      itemType: "annotation",
+      isAttachment: () => false,
+      isNote: () => false,
+      isRegularItem: () => false,
+      getField: () => "",
+    };
+
+    const ITEM_STATE_KEY = "extensions.ccf-for-zotero.itemState";
+    prefs.set(
+      ITEM_STATE_KEY,
+      JSON.stringify({
+        version: 1,
+        items: {
+          "1:501": {
+            itemKey: "1:501",
+            status: "preprint",
+            source: "auto",
+            venueText: "arXiv",
+            preprintSignal: true,
+            stateVersion: ITEM_STATE_VERSION,
+            catalogVersion: "CCF-2026-v7-pdf-audited+CCF-HQJ-2025",
+            matcherVersion: getMatcherVersion(),
+            updatedAt: "2026-11-16T00:00:00.000Z",
+          },
+          "1:502": {
+            itemKey: "1:502",
+            status: "matched",
+            source: "auto",
+            rank: "A",
+            abbr: "ACL",
+            fullName: "Annual Meeting of the Association for Computational Linguistics",
+            matchYear: "2026",
+            preprintSignal: true,
+            stateVersion: ITEM_STATE_VERSION,
+            catalogVersion: "CCF-2026-v7-pdf-audited+CCF-HQJ-2025",
+            matcherVersion: getMatcherVersion(),
+            updatedAt: "2026-11-16T00:00:00.000Z",
+          },
+          "1:503": {
+            itemKey: "1:503",
+            status: "none",
+            source: "auto",
+            venueText: "Proceedings of the IEEE",
+            stateVersion: ITEM_STATE_VERSION,
+            catalogVersion: "CCF-2026-v7-pdf-audited+CCF-HQJ-2025",
+            matcherVersion: getMatcherVersion(),
+            updatedAt: "2026-11-16T00:00:00.000Z",
+          },
+        },
+      }),
+    );
+
+    const items: Record<number, any> = {
+      501: arxivItem,
+      502: aclItem,
+      503: procIeeeItem,
+      504: annotationItem,
+    };
+    const originalZotero = (globalThis as any).Zotero;
+    const originalZtoolkit = (globalThis as any).ztoolkit;
+    let registeredColumn: any;
+    (globalThis as any).Zotero = {
+      ItemTreeManager: {
+        async registerColumns(value: any) {
+          registeredColumn = value;
+          return ["ccf-column-key"];
+        },
+      },
+      Items: {
+        get(id: number | string) {
+          return items[Number(id)] ?? false;
+        },
+      },
+      getMainWindows: () => [],
+      Prefs: {
+        get(key: string) {
+          return prefs.has(key) ? prefs.get(key) : "";
+        },
+        set(key: string, value: string) {
+          prefs.set(key, value);
+        },
+        clear(key: string) {
+          prefs.delete(key);
+        },
+      },
+    };
+    (globalThis as any).ztoolkit = { log() {} };
+
+    try {
+      clearStorageMemoryCache();
+      resetInvalidationRecomputeForTest();
+      await registerCCFColumn();
+
+      // 目录版本升级后，列渲染立即平滑保留旧缓存，不瞬间抹为 Unknown。
+      assert.equal(getColumnDisplayState(arxivItem).status, "preprint");
+      assert.equal(unpackColumnData(registeredColumn.dataProvider(arxivItem)).display, "Preprint | arXiv 2026");
+      assert.equal(unpackColumnData(registeredColumn.dataProvider(aclItem)).display, "CCF A | ACL 2026");
+      assert.equal(unpackColumnData(registeredColumn.dataProvider(procIeeeItem)).display, "CCF None | Proceedings of the IEEE 2025");
+
+      // 同时旧目录版本条目已进入后台迁移队列。
+      assert.equal(needsRankRecompute(arxivItem), true);
+      assert.equal(needsRankRecompute(aclItem), true);
+      assert.equal(needsRankRecompute(procIeeeItem), true);
+      assert.equal(hasPendingInvalidationRecompute(), true);
+
+      const migrated = await runInvalidationRecomputeNow();
+      assert.equal(migrated.ccfItems, 3);
+      assert.equal(needsRankRecompute(arxivItem), false);
+      assert.equal(needsRankRecompute(aclItem), false);
+      assert.equal(needsRankRecompute(procIeeeItem), false);
+      // 迁移后 Proceedings of the IEEE 自动从旧 None 升级为新目录 CCF A | Proc. IEEE。
+      assert.equal(
+        unpackColumnData(registeredColumn.dataProvider(procIeeeItem)).display,
+        "CCF A | Proc. IEEE 2025",
+      );
+      assert.equal(
+        JSON.parse(prefs.get(ITEM_STATE_KEY) || "{}").items["1:501"].catalogVersion,
+        getCatalogVersion(),
+      );
+
+      // 已迁移条目与非普通条目（annotation）再次渲染时不会重复排队。
+      assert.equal(hasPendingInvalidationRecompute(), false);
+      registeredColumn.dataProvider(arxivItem);
+      registeredColumn.dataProvider(annotationItem);
+      assert.equal(hasPendingInvalidationRecompute(), false);
+    } finally {
+      clearStorageMemoryCache();
+      resetInvalidationRecomputeForTest();
+      setCCFSortColumnKey(undefined);
+      (globalThis as any).Zotero = originalZotero;
+      (globalThis as any).ztoolkit = originalZtoolkit;
+    }
   });
 });

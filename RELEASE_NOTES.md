@@ -10,11 +10,11 @@
   - 修正 `ICSOC` 简称（由 `CSOC` 改为 `ICSOC`），补充带连字符全称 `International Conference on Service-Oriented Computing`，并移除裸别名 `CSOC`，避免与独立的 Computer Science On-line Conference（`CSOC`）误匹配。
   - 修正目录中 15 处 PDF 提取造成的空格/大小写拼写问题（含 `NAACL`、`OOPSLA`、`RTAS`、`LCTES`、`SANER`、`VMCAI`、`EDBT`、`CIDR`、`I3D`、`ICASSP`、`ICME`、`UAI`、`RECOMB`、`CC` 及 `TOMM`），保持原有 682 条国际目录与 68 条中文高质量期刊（共 750 条）完整覆盖。
 - **修复 `Proceedings of the IEEE` 识别失效**：在剥离会议论文集样板前缀 `Proceedings of (the)` 前增加窄范围期刊精确全称匹配，确保 `Proceedings of the IEEE` 正确识别为 CCF-A（`Proc. IEEE`），同时裸 `IEEE` 保持不误匹配。
-- **升级目录版本号触发自动缓存重算**：目录版本更新为 `CCF-2026-v7-pdf-audited-r2`，升级插件后既有自动识别缓存会自动失效重算，手动标注条目不受影响。
+- **升级目录版本号并平滑迁移旧缓存**：目录版本更新为 `CCF-2026-v7-pdf-audited-r2`。列渲染在目录/匹配器版本升级后先平滑保留旧缓存展示（不再瞬间把全库抹为 `Unknown`），同时自动将可见的旧版本与未缓存普通条目排入防抖后台队列异步迁移并刷新视图；手动标注条目不受影响。
 
 ### 校验
 
-- 自动化测试：223 项全部通过（新增更名期刊/会议、连字符/斜杠变体、`Proceedings of the IEEE` 正反例、`ICSOC`/`CSOC` 正反例回归测试）。
+- 自动化测试：229 项全部通过（新增更名期刊/会议、连字符/斜杠变体、`Proceedings of the IEEE` 正反例、`ICSOC`/`CSOC` 正反例，以及目录升级平滑展示、列按需后台迁移、并发提交保护、被动定时器与过滤状态对齐回归测试）。
 - TypeScript 类型检查及 Zotero 插件构建通过（版本 `0.2.19`）。
 
 ## v0.2.18

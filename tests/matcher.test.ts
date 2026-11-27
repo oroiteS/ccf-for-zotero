@@ -1389,6 +1389,102 @@ describe("local CCF matcher", () => {
     }
   });
 
+  it("aligns filterItemsByDisplayStatus with column badges for stale-catalog matched items", async () => {
+    const staleMatchedItem = makeItem(
+      { proceedingsTitle: "ACL 2026" },
+      "conferencePaper",
+      311,
+    );
+    const staleNoneItem = makeItem(
+      { publicationTitle: "Journal of Extremely Local Experiments" },
+      "journalArticle",
+      312,
+    );
+    const uncachedItem = makeItem(
+      { proceedingsTitle: "EMNLP 2025" },
+      "conferencePaper",
+      313,
+    );
+    const editedItem = makeItem(
+      { proceedingsTitle: "NeurIPS 2025" },
+      "conferencePaper",
+      314,
+    );
+
+    const rawStore = JSON.stringify({
+      version: 1,
+      items: {
+        "1:311": {
+          itemKey: "1:311",
+          status: "matched",
+          source: "auto",
+          rank: "A",
+          abbr: "ACL",
+          inputFingerprint: getItemInputFingerprint(staleMatchedItem),
+          stateVersion: ITEM_STATE_VERSION,
+          catalogVersion: "CCF-2026-v7-pdf-audited+old",
+          matcherVersion: getMatcherVersion(),
+          updatedAt: "2026-11-16T00:00:00.000Z",
+        },
+        "1:312": {
+          itemKey: "1:312",
+          status: "none",
+          source: "auto",
+          venueText: "Journal of Extremely Local Experiments",
+          inputFingerprint: getItemInputFingerprint(staleNoneItem),
+          stateVersion: ITEM_STATE_VERSION,
+          catalogVersion: "CCF-2026-v7-pdf-audited+old",
+          matcherVersion: getMatcherVersion(),
+          updatedAt: "2026-11-16T00:00:00.000Z",
+        },
+        "1:314": {
+          itemKey: "1:314",
+          status: "matched",
+          source: "auto",
+          rank: "B",
+          abbr: "EMNLP",
+          inputFingerprint: getItemInputFingerprint(
+            makeItem({ proceedingsTitle: "EMNLP 2025" }, "conferencePaper", 314),
+          ),
+          stateVersion: ITEM_STATE_VERSION,
+          catalogVersion: getCatalogVersion(),
+          matcherVersion: getMatcherVersion(),
+          updatedAt: "2026-11-16T00:00:00.000Z",
+        },
+      },
+    });
+
+    const originalZotero = (globalThis as any).Zotero;
+    (globalThis as any).Zotero = {
+      Prefs: {
+        get: () => rawStore,
+        set() {
+          throw new Error("filtering should not save prefs");
+        },
+      },
+    };
+
+    try {
+      clearStorageMemoryCache();
+      assert.equal(getColumnDisplayState(staleMatchedItem).status, "matched");
+      assert.equal(getColumnDisplayState(staleNoneItem).status, "none");
+
+      const result = await filterItemsByDisplayStatus(
+        [staleMatchedItem, staleNoneItem, uncachedItem, editedItem],
+        ["unknown", "none"],
+      );
+
+      assert.equal(result.cancelled, false);
+      assert.deepEqual(
+        result.items.map((item) => item.id),
+        [312, 313, 314],
+      );
+    } finally {
+      clearStorageMemoryCache();
+      (globalThis as any).Zotero = originalZotero;
+    }
+  });
+
   it("renders diagnostics without writing Zotero metadata", () => {
     const output = formatItemDiagnostics(
       makeItem({
